@@ -1,6 +1,7 @@
 ---
 name: code-review
 description: "Reviews a change as a team: runs tests and the app, checks UI in Chrome, sends independent reviewers, verifies each finding. Use before opening a PR or when asked for a review."
+disable-model-invocation: true
 ---
 
 # Review a change as a team
