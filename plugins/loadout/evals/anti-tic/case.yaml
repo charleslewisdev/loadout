@@ -31,3 +31,55 @@ graders:
     match: not_contains
     flags: i
     pattern: "\\b(it|this|that)(['\\u2019]s not| is not| isn['\\u2019]t)\\b[^.!?\\n]{1,80}?[,;:.\\u2014]\\s*(it|this|that)(['\\u2019]s| is)\\b"
+# The habits menu from the design review, one grader each. Only habits the model
+# still shows with the style are candidates to move into the style.
+  - name: no-opening-praise
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "^\\s*(great|good|excellent|fantastic) (question|point|idea)|you['\\u2019]?re (absolutely|totally|completely) right"
+  - name: no-apology
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "\\b(sorry|apologi[sz]e|my apologies|my mistake)\\b"
+  - name: no-closing-offer
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "let me know if|hope (this|that) helps|feel free to (ask|reach out)"
+  - name: no-service-phrase
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "certainly!|absolutely!|i['\\u2019]?d be (happy|glad) to|happy to help"
+  - name: no-restating-question
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "^\\s*(so,? )?(you want|you['\\u2019]?re asking|you are asking|it sounds like you)"
+  - name: no-recap
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "\\b(in summary|to summari[sz]e|in conclusion|tl;dr)\\b"
+  - name: no-hedge-stack
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "might potentially|could potentially|may potentially|could possibly"
+  - name: no-filler-opener
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "let['\\u2019]?s dive in|here['\\u2019]?s the thing|let['\\u2019]?s break (this|it) down"
+  - name: no-assistant-vocabulary
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "\\b(delve|robust|seamless(ly)?|leverag(e|es|ing)|comprehensive|crucial)\\b"
+  - name: no-emoji
+    type: regex
+    match: not_contains
+    flags: u
+    pattern: "[\\u{1F300}-\\u{1FAFF}\\u{2600}-\\u{27BF}]"
