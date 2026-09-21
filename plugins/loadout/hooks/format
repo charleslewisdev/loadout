@@ -3,11 +3,14 @@
 # repository configures a formatter for it, found by walking up from the file:
 #   prettier  a .prettierrc*, prettier.config.* or "prettier" key in package.json,
 #             and prettier installed in a node_modules/.bin on the way up
-#   ruff      a ruff.toml, .ruff.toml or [tool.ruff] in pyproject.toml, and ruff on PATH
+#   ruff      an explicit format setting ([tool.ruff.format] in pyproject.toml,
+#             [format] in ruff.toml or .ruff.toml, or a ruff-format pre-commit hook)
+#             and ruff on PATH; many repos use ruff for linting only
+# Paths are physical, so a symlinked checkout cannot walk past its repository root.
 # Prints nothing and never fails the tool call.
 file=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [ -f "$file" ] || exit 0
-dir=$(cd "$(dirname "$file")" && pwd) || exit 0
+dir=$(cd "$(dirname "$file")" && pwd -P) || exit 0
 root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || root=/
 
 # find_up <test command...>: the first directory from $dir up to $root where the test passes
@@ -24,14 +27,16 @@ has_prettier_config() {
     jq -e 'has("prettier")' "$1/package.json" >/dev/null 2>&1
 }
 has_prettier_bin() { [ -x "$1/node_modules/.bin/prettier" ]; }
-has_ruff_config() {
-  [ -f "$1/ruff.toml" ] || [ -f "$1/.ruff.toml" ] || grep -q '^\[tool\.ruff' "$1/pyproject.toml" 2>/dev/null
+has_ruff_format() {
+  grep -q '^\[tool\.ruff\.format\]' "$1/pyproject.toml" 2>/dev/null ||
+    grep -q '^\[format\]' "$1/ruff.toml" "$1/.ruff.toml" 2>/dev/null ||
+    grep -q 'id: *ruff-format' "$1/.pre-commit-config.yaml" 2>/dev/null
 }
 
 case "$file" in
   *.py | *.pyi)
-    if find_up has_ruff_config >/dev/null && command -v ruff >/dev/null; then
-      ruff format --quiet "$file" >/dev/null 2>&1
+    if find_up has_ruff_format >/dev/null && command -v ruff >/dev/null; then
+      (cd "$dir" && ruff format --quiet --force-exclude "$file") >/dev/null 2>&1
     fi
     ;;
   *.js | *.jsx | *.mjs | *.cjs | *.ts | *.tsx | *.json | *.css | *.scss | *.less | *.html | *.vue | *.svelte | *.md | *.mdx | *.yaml | *.yml | *.graphql)
