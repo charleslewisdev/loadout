@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Time a hook command.
+#
+#   hook-timed <name> -- <command> [args]
+#
+# Runs the command with this script's stdin, stdout and stderr, exits with its
+# status, and appends "name,start,end" in $EPOCHREALTIME seconds to
+# ~/.claude/hook-latency.log (HOOK_LATENCY_LOG overrides). scripts/hook-report
+# prints p50, p95 and max per hook.
+if [[ $# -lt 3 || $2 != -- ]]; then
+  echo "usage: hook-timed <name> -- <command> [args]" >&2
+  exit 2
+fi
+name=$1
+shift 2
+start=$EPOCHREALTIME
+"$@"
+status=$?
+end=$EPOCHREALTIME
+printf '%s,%s,%s\n' "$name" "$start" "$end" >>"${HOOK_LATENCY_LOG:-$HOME/.claude/hook-latency.log}" 2>/dev/null
+exit $status

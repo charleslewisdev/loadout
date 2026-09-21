@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Hook latency from ~/.claude/hook-latency.log (HOOK_LATENCY_LOG overrides).
+#
+#   scripts/hook-report [days]     default 7
+#
+# Prints calls, p50, p95 and max in milliseconds per hook, nearest-rank
+# percentiles. Budgets (ADR-09): SessionStart 300 ms, notify 100 ms, formatter
+# 300 ms, Bash guard 50 ms at p95.
+set -euo pipefail
+
+days=${1:-7}
+log=${HOOK_LATENCY_LOG:-$HOME/.claude/hook-latency.log}
+if [[ ! -s $log ]]; then
+  echo "hook-report: no entries in ${log/#"$HOME"/\~}"
+  exit 0
+fi
+
+since=$(awk -v d="$days" -v now="$EPOCHREALTIME" 'BEGIN { printf "%.6f", now - d * 86400 }')
+awk -F, -v since="$since" 'NF == 3 && $2 >= since { printf "%s,%.3f\n", $1, ($3 - $2) * 1000 }' "$log" |
+  sort -t, -k1,1 -k2,2g |
+  awk -F, -v days="$days" '
+    function flush() {
+      if (n == 0) return
+      p50 = v[int((n * 50 + 99) / 100)]; p95 = v[int((n * 95 + 99) / 100)]
+      printf "%-20s %6d %9.1f %9.1f %9.1f\n", name, n, p50, p95, v[n]
+      n = 0
+    }
+    BEGIN { printf "%-20s %6s %9s %9s %9s   (last %s days)\n", "hook", "calls", "p50 ms", "p95 ms", "max ms", days }
+    $1 != name { flush(); name = $1 }
+    { v[++n] = $2 }
+    END { flush() }'
