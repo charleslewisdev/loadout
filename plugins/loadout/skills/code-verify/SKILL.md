@@ -1,6 +1,7 @@
 ---
 name: code-verify
 description: "Proves work is done before saying so: runs the tests, lint and build that cover the change and shows the output. Use before claiming anything is done, fixed or passing."
+disable-model-invocation: true
 ---
 
 # Verify before you claim
