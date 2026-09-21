@@ -168,6 +168,7 @@ mkdir -p "$cache"
   echo "share=$share_lo-$share_hi"
   echo "mcp=$mcp_lo-$mcp_hi"
   echo "ceiling=$ceiling"
+  cat "$tmp"/empty-configured.*.log | sed -n 's/.*Skill listing over budget: \([0-9]*\) skills, \([0-9]*\) chars > \([0-9]*\) budget.*/listing_skills=\1\nlisting_chars=\2\nlisting_budget=\3/p' | awk 'NR <= 3'
   echo "result=$result"
 } >"$cache/budget"
 

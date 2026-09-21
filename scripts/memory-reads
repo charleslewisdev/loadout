@@ -75,6 +75,8 @@ for dir in "$projects"/*/; do
   done < <(find "$dir" -maxdepth 1 -name '*.jsonl' -mtime "-$days")
 done
 
+mkdir -p "${LOADOUT_CACHE:-$HOME/.cache/loadout}"
+exec > >(tee "${LOADOUT_CACHE:-$HOME/.cache/loadout}/memory-reads")
 echo "Auto-memory reads, last $days days, $(date +%F)"
 echo "  sessions scanned            $scanned"
 echo "  sessions in skipped dirs    $skipped"
