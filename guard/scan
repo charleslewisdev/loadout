@@ -2,13 +2,16 @@
 # Identity and secret guard. Scans text headed for git history.
 #
 #   guard/scan diff          staged changes plus the author and committer identity
-#   guard/scan range <revs>  commits in a git log range: diffs, messages, emails
+#   guard/scan range <revs>  commits in a git log range: paths, diffs, messages, emails
 #   guard/scan --all         every commit on every ref
-#   guard/scan msg <file>    a commit message
+#   guard/scan msg <file>    a commit message without git's comments, or ref names
+#   guard/scan tag <object>  an annotated tag: its name, message and tagger email
 #
 # Three checks: the private denylist (never in this repo), secret patterns, and
-# author emails against guard/allowed-emails. Findings name a location and a
-# denylist line number, never the matched text. Exit 0 clean, 1 findings, 2 error.
+# emails against guard/allowed-emails, where "committer-only <email>" admits an
+# address as committer only (GitHub's merge commits). Findings name a location and
+# a denylist line number, never the matched text; a path that matches is withheld.
+# Exit 0 clean, 1 findings, 2 error.
 #
 # GUARD_DENYLIST            denylist path (default ~/.config/loadout-guard/denylist)
 # GUARD_REQUIRE_DENYLIST=1  a missing denylist is a finding, not a skipped check
@@ -38,71 +41,113 @@ printf '%s\n' "${secrets[@]}" >"$tmp/secrets"
 finding() { printf 'guard: %s\n' "$*" >>"$findings"; }
 tilde() { printf '%s' "${1/#"$HOME"/\~}"; }
 
-if [[ -r $deny ]]; then
-  grep -v -e '^[[:space:]]*$' "$deny" >"$tmp/deny"
-else
-  : >"$tmp/deny"
-  if [[ ${GUARD_REQUIRE_DENYLIST:-0} == 1 ]]; then
-    finding "denylist missing at $(tilde "$deny")"
-  else
-    echo "guard: denylist missing at $(tilde "$deny"); vocabulary check skipped" >&2
+# grep -n into $tmp/hits. Status 2 (a bad pattern, an unreadable file) stops the
+# scan: an error must never pass as "no match".
+hits() {  # pattern file, text file, extra grep flags...
+  local rc=0
+  grep -n -a -E "${@:3}" -f "$1" "$2" >"$tmp/hits" || rc=$?
+  if ((rc > 1)); then
+    echo "guard: grep failed with status $rc on $(basename "$1")" >&2
+    exit 2
   fi
+}
+
+: >"$tmp/deny"
+if [[ -r $deny ]]; then
+  grep -v -e '^[[:space:]]*$' "$deny" >"$tmp/deny" || true
+  if [[ ! -s $tmp/deny ]]; then
+    finding "the denylist at $(tilde "$deny") holds no patterns"
+  else
+    rc=0
+    grep -E -f "$tmp/deny" /dev/null || rc=$?
+    if ((rc > 1)); then
+      echo "guard: the denylist at $(tilde "$deny") holds an invalid pattern" >&2
+      exit 2
+    fi
+  fi
+elif [[ ${GUARD_REQUIRE_DENYLIST:-0} == 1 ]]; then
+  finding "denylist missing at $(tilde "$deny")"
+else
+  echo "guard: denylist missing at $(tilde "$deny"); vocabulary check skipped" >&2
 fi
 
 # Unified diff (optionally with commit and message markers) to two parallel
-# files: text holds each added line or path, where holds its location.
+# files: text holds each path and added line, where holds its location. A path is
+# emitted once per file unless the file is deleted, so renames (with --no-renames)
+# and empty new files are covered. Header lines count only before a file's first
+# hunk, so an added line that starts with "++ " is still content.
 records() {
   awk -v T="$tmp/text" -v W="$tmp/where" '
     function emit(s) { print s > T; print c ":" p ":" n > W }
+    function flush() { if (pend != "") { p = pend; n = 0; emit(p) } pend = "" }
     BEGIN { c = "staged" }
-    /^\001COMMIT / { c = substr($2, 1, 10); m = 1; p = "(message)"; n = 0; next }
+    /^\001COMMIT / { flush(); c = substr($2, 1, 10); m = 1; p = "(message)"; n = 0; next }
     /^\001ENDMSG/  { m = 0; next }
     m { n++; emit($0); next }
-    /^diff --(git|cc|combined) / { w = 0; next }
-    /^--- / { next }
-    /^\+\+\+ / { p = substr($0, 5); sub(/^b\//, "", p); n = 0; if (p != "/dev/null") emit(p); next }
-    /^@@/ { match($0, /^@+/); w = RLENGTH - 1
+    /^diff --git / { flush(); w = 0; pend = $0; sub(/^diff --git a\/.* b\//, "", pend); p = pend; next }
+    /^diff --(cc|combined) / { flush(); w = 0; pend = $0; sub(/^diff --(cc|combined) /, "", pend); p = pend; next }
+    !w && /^deleted file mode/ { pend = ""; next }
+    !w && /^--- / { next }
+    !w && /^\+\+\+ / { if ($0 == "+++ /dev/null") pend = ""; else flush(); next }
+    /^@@/ { flush(); match($0, /^@+/); w = RLENGTH - 1
             match($0, / \+[0-9]+/); n = substr($0, RSTART + 2, RLENGTH - 2) + 0; next }
     w && substr($0, 1, w) ~ /\+/ && substr($0, 1, w) !~ /-/ { emit(substr($0, w + 1)); n++; next }
+    END { flush() }
   '
+}
+
+where() {  # line number in $tmp/where; withholds a path that matches the denylist
+  local loc commit path line
+  loc=$(sed -n "${1}p" "$tmp/where")
+  commit=${loc%%:*}
+  line=${loc##*:}
+  path=${loc#*:}
+  path=${path%:*}
+  if [[ -s $tmp/deny ]] && grep -q -a -i -E -f "$tmp/deny" <<<"$path"; then
+    path='(path withheld, it matches the denylist)'
+  fi
+  printf '%s:%s:%s' "$commit" "$path" "$line"
 }
 
 check_records() {
   [[ -s $tmp/text ]] || return 0
   local n line i pat hit
   if [[ -s $tmp/deny ]]; then
+    hits "$tmp/deny" "$tmp/text" -i
     while IFS=: read -r n _; do
       line=$(sed -n "${n}p" "$tmp/text")
       hit='?'
       while IFS=: read -r i pat; do
         if grep -q -a -i -E -e "$pat" <<<"$line"; then hit=$i; break; fi
       done < <(grep -n -v -e '^[[:space:]]*$' "$deny")
-      finding "denylist line $hit matches at $(sed -n "${n}p" "$tmp/where")"
-    done < <(grep -n -a -i -E -f "$tmp/deny" "$tmp/text" || true)
+      finding "denylist line $hit matches at $(where "$n")"
+    done <"$tmp/hits"
   fi
+  hits "$tmp/secrets" "$tmp/text"
   while IFS=: read -r n _; do
-    finding "secret pattern matches at $(sed -n "${n}p" "$tmp/where")"
-  done < <(grep -n -a -E -f "$tmp/secrets" "$tmp/text" || true)
+    finding "secret pattern matches at $(where "$n")"
+  done <"$tmp/hits"
 }
 
 email_ok() { grep -q -i -x -F -e "$1" "$allowed"; }
+committer_ok() { email_ok "$1" || grep -q -i -x -F -e "committer-only $1" "$allowed"; }
 
 check_emails() {  # git log arguments
   local c ae ce
   while IFS=$'\t' read -r c ae ce; do
     email_ok "$ae" || finding "author email of commit ${c:0:10} is not in guard/allowed-emails"
-    email_ok "$ce" || finding "committer email of commit ${c:0:10} is not in guard/allowed-emails"
+    committer_ok "$ce" || finding "committer email of commit ${c:0:10} is not in guard/allowed-emails"
   done < <(git log --format='%H%x09%ae%x09%ce' "$@")
 }
 
 log_records() {  # git log arguments
-  git log --no-color --no-ext-diff --text -p --cc -U0 --src-prefix=a/ --dst-prefix=b/ \
+  git log --no-color --no-ext-diff --no-renames --text -p --cc -U0 --src-prefix=a/ --dst-prefix=b/ \
     --format='format:%x01COMMIT %H%n%B%n%x01ENDMSG' "$@" | records
 }
 
 case "${1:-}" in
   diff)
-    git diff --cached --no-color --no-ext-diff --text -U0 --src-prefix=a/ --dst-prefix=b/ | records
+    git diff --cached --no-color --no-ext-diff --no-renames --text -U0 --src-prefix=a/ --dst-prefix=b/ | records
     check_records
     for who in AUTHOR COMMITTER; do
       email=$(git var "GIT_${who}_IDENT" 2>/dev/null | sed -n 's/.*<\(.*\)>.*/\1/p') || email=''
@@ -123,11 +168,19 @@ case "${1:-}" in
     ;;
   msg)
     [[ -r ${2:-} ]] || { echo "usage: guard/scan msg <file>" >&2; exit 2; }
-    { printf '\001COMMIT message\n'; cat "$2"; printf '\n\001ENDMSG\n'; } | records
+    sed '/^# -* >8 -*$/,$d' "$2" | git stripspace --strip-comments >"$tmp/msg"
+    { printf '\001COMMIT message\n'; cat "$tmp/msg"; printf '\n\001ENDMSG\n'; } | records
     check_records
     ;;
+  tag)
+    [[ $(git cat-file -t "${2:-}" 2>/dev/null) == tag ]] || { echo "usage: guard/scan tag <tag object>" >&2; exit 2; }
+    { printf '\001COMMIT tag\n'; git cat-file tag "$2"; printf '\n\001ENDMSG\n'; } | records
+    check_records
+    tagger=$(git cat-file tag "$2" | sed -n 's/^tagger .*<\(.*\)>.*/\1/p')
+    email_ok "$tagger" || finding "the tagger email of tag object ${2:0:10} is not in guard/allowed-emails"
+    ;;
   *)
-    sed -n '2,10s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,17s/^# \{0,1\}//p' "$0" >&2
     exit 2
     ;;
 esac
