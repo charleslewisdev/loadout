@@ -125,7 +125,7 @@ printf '    %-15s %s skills, %s characters of name and description, about %s tok
 
 details=$(claude plugin details loadout@loadout 2>/dev/null | sed -n 's/^ *Always-on: *\(.*\)/\1/p' | tr -s ' ') || true
 if [[ -n $details ]]; then
-  printf '  %-17s %s  (the CLI does not count SessionStart hook output)\n' 'loadout plugin' "$details"
+  printf '  %-17s %s  (the CLI counts neither the output style nor SessionStart hook output)\n' 'loadout plugin' "$details"
 else
   printf '  %-17s not installed\n' 'loadout plugin'
 fi
