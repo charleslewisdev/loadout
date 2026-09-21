@@ -1,0 +1,38 @@
+# code-review smoke case: a feature branch with a counting bug its own test misses
+# and a broken project rule. The skill's point is the team: checks run first,
+# independent reviewer subagents, a verifier. Run with --scaffold --allow-tools Bash.
+# Needs a working shell: reviewers read the diff with git and the checks run tests.
+# Not yet validly run on this machine (see the note below). The skill-fired
+# indicator matches loadout:code-review, because a bundled skill is also named
+# code-review and the model sometimes picks that one.
+# On this machine the eval sandbox cannot run Bash (bubblewrap is blocked by
+# kernel.apparmor_restrict_unprivileged_userns), so graders judge attempts, order
+# and final files, never a command's output.
+schema_version: "1.1"
+name: code-review-smoke
+tags: [smoke, code-review]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Bash, Glob, Grep, Agent, Skill]
+  prompt: "Review my branch feature/page-count against main before I open a PR."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: "loadout:code-review"
+    arm: with-only
+  - name: ran-the-tests
+    type: tool_used
+    tool: Bash
+    input_match: "unittest|pytest"
+  - name: independent-reviewers
+    type: tool_used
+    tool: Agent
+    min: 3
+  - name: found-the-bug
+    type: llm
+    criteria: "Pass only if the review reports that page_count undercounts when total is not a multiple of per_page (for example 10 items at 3 per page gives 3 instead of 4 pages)."
