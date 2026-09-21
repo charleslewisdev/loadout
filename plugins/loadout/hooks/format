@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# PostToolUse formatter for Edit and Write. Formats the edited file only when the
+# repository configures a formatter for it, found by walking up from the file:
+#   prettier  a .prettierrc*, prettier.config.* or "prettier" key in package.json,
+#             and prettier installed in a node_modules/.bin on the way up
+#   ruff      a ruff.toml, .ruff.toml or [tool.ruff] in pyproject.toml, and ruff on PATH
+# Prints nothing and never fails the tool call.
+file=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
+[ -f "$file" ] || exit 0
+dir=$(cd "$(dirname "$file")" && pwd) || exit 0
+root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || root=/
+
+# find_up <test command...>: the first directory from $dir up to $root where the test passes
+find_up() {
+  local d=$dir
+  while :; do
+    if "$@" "$d"; then printf '%s' "$d"; return 0; fi
+    [ "$d" = "$root" ] || [ "$d" = / ] && return 1
+    d=$(dirname "$d")
+  done
+}
+has_prettier_config() {
+  compgen -G "$1/.prettierrc*" >/dev/null || compgen -G "$1/prettier.config.*" >/dev/null ||
+    jq -e 'has("prettier")' "$1/package.json" >/dev/null 2>&1
+}
+has_prettier_bin() { [ -x "$1/node_modules/.bin/prettier" ]; }
+has_ruff_config() {
+  [ -f "$1/ruff.toml" ] || [ -f "$1/.ruff.toml" ] || grep -q '^\[tool\.ruff' "$1/pyproject.toml" 2>/dev/null
+}
+
+case "$file" in
+  *.py | *.pyi)
+    if find_up has_ruff_config >/dev/null && command -v ruff >/dev/null; then
+      ruff format --quiet "$file" >/dev/null 2>&1
+    fi
+    ;;
+  *.js | *.jsx | *.mjs | *.cjs | *.ts | *.tsx | *.json | *.css | *.scss | *.less | *.html | *.vue | *.svelte | *.md | *.mdx | *.yaml | *.yml | *.graphql)
+    if find_up has_prettier_config >/dev/null && bin=$(find_up has_prettier_bin); then
+      "$bin/node_modules/.bin/prettier" --write --ignore-unknown --log-level=silent "$file" >/dev/null 2>&1
+    fi
+    ;;
+esac
+exit 0
