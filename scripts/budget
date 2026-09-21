@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# Turn-0 token cost of this machine's Claude Code setup (success criterion S1).
+#
+#   scripts/budget [--project <dir>] [--runs <n>]
+#
+# Sends one fixed prompt to Haiku in a fresh temp directory, in four
+# configurations, n times each (default 3), and sums input_tokens,
+# cache_creation_input_tokens and cache_read_input_tokens from `usage`:
+#
+#   as configured     nothing added
+#   auto-memory off   CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
+#   no MCP            auto-memory off, plus an empty strict MCP config
+#   vendor floor      --safe-mode
+#
+# Harness share is auto-memory off minus the floor, checked against the ceiling
+# at its highest. --project repeats the runs in <dir>, so its CLAUDE.md and memory
+# index are counted. The result is cached in ~/.cache/loadout/budget.
+set -euo pipefail
+
+ceiling=6000
+absolute=8000
+runs=3
+project=''
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --project) project=$(cd "$2" && pwd); shift 2 ;;
+    --runs) runs=$2; shift 2 ;;
+    -h | --help) sed -n '2,17s/^# \{0,1\}//p' "$0"; exit 0 ;;
+    *) echo "usage: scripts/budget [--project <dir>] [--runs <n>]" >&2; exit 2 ;;
+  esac
+done
+
+prompt='Reply with exactly the word OK and nothing else.'
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+# A child of a running session inherits that session's variables. Drop them so
+# the numbers match a run from a plain terminal.
+clean=()
+for v in $(compgen -e); do
+  case $v in
+    CLAUDECODE | CLAUDE_PID | CLAUDE_EFFORT | CLAUDE_CODE_SESSION_* | CLAUDE_CODE_CHILD_SESSION | \
+      CLAUDE_CODE_MESSAGING_* | CLAUDE_CODE_BRIDGE_* | CLAUDE_CODE_ENTRYPOINT | CLAUDE_CODE_EXECPATH | \
+      CLAUDE_CODE_SSE_PORT) clean+=(-u "$v") ;;
+  esac
+done
+
+commas() { sed ':a;s/\B[0-9]\{3\}\>/,&/;ta' <<<"$1"; }
+tilde() { printf '%s' "${1/#"$HOME"/\~}"; }
+
+# measure <label> <dir> <env assignment or ''> [flags]: runs in parallel and
+# writes "min max" to $tmp/<label>.range, keeping each run's JSON and debug log.
+measure() {
+  local label=$1 dir=$2 assign=$3 i
+  shift 3
+  echo "budget: $label, $runs runs" >&2
+  for ((i = 1; i <= runs; i++)); do
+    (cd "$dir" && env "${clean[@]}" ${assign:+"$assign"} claude -p "$prompt" --model haiku \
+      --output-format json --debug-file "$tmp/$label.$i.log" "$@" >"$tmp/$label.$i.json" 2>"$tmp/$label.$i.err") &
+  done
+  wait
+  for ((i = 1; i <= runs; i++)); do
+    if ! jq -e '(.is_error | not) and (.usage.input_tokens != null)' "$tmp/$label.$i.json" >/dev/null 2>&1; then
+      echo "budget: run $i of '$label' failed:" >&2
+      cat "$tmp/$label.$i.json" "$tmp/$label.$i.err" >&2
+      exit 1
+    fi
+  done
+  for ((i = 1; i <= runs; i++)); do
+    jq '.usage | .input_tokens + .cache_creation_input_tokens + .cache_read_input_tokens' "$tmp/$label.$i.json"
+  done | sort -n | sed -n '1p;$p' | paste -sd' ' >"$tmp/$label.range"
+}
+
+deferred() {  # distinct deferred-tool counts seen in a configuration's debug logs
+  cat "$tmp/$1".*.log | sed -n 's/.*Dynamic tool loading: [0-9]*\/\([0-9]*\) deferred.*/\1/p' |
+    sort -un | paste -sd/
+}
+
+range() { if [[ $1 == "$2" ]]; then commas "$1"; else echo "$(commas "$1") to $(commas "$2")"; fi; }
+
+# block <dir>: measures the four configurations in <dir> and prints them.
+block() {
+  local dir=$1 tag=$2
+  measure "$tag-configured" "$dir" ''
+  measure "$tag-automem-off" "$dir" CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
+  measure "$tag-no-mcp" "$dir" CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 \
+    --strict-mcp-config --mcp-config '{"mcpServers":{}}'
+  measure "$tag-floor" "$dir" '' --safe-mode
+  read -r c_lo c_hi <"$tmp/$tag-configured.range"
+  read -r a_lo a_hi <"$tmp/$tag-automem-off.range"
+  read -r m_lo m_hi <"$tmp/$tag-no-mcp.range"
+  read -r f_lo f_hi <"$tmp/$tag-floor.range"
+  share_lo=$((a_lo - f_hi)) share_hi=$((a_hi - f_lo))
+  mem_lo=$((c_lo - a_hi)) mem_hi=$((c_hi - a_lo))
+  mcp_lo=$((a_lo - m_hi)) mcp_hi=$((a_hi - m_lo))
+  configured_lo=$c_lo configured_hi=$c_hi automem_off_lo=$a_lo automem_off_hi=$a_hi floor_lo=$f_lo floor_hi=$f_hi
+  printf '  %-17s %s\n' 'as configured' "$(range "$c_lo" "$c_hi")"
+  printf '  %-17s %s\n' 'auto-memory off' "$(range "$a_lo" "$a_hi")"
+  printf '  %-17s %s  (--safe-mode)\n' 'vendor floor' "$(range "$f_lo" "$f_hi")"
+  printf '  %-17s %s  (as configured minus auto-memory off; outside the ceiling)\n' \
+    'auto-memory' "$(range "$mem_lo" "$mem_hi")"
+  printf '  %-17s %s  (auto-memory off minus the floor)\n' 'harness share' "$(range "$share_lo" "$share_hi")"
+  printf '    %-15s %s  (inside the share; %s deferred tool names, %s without MCP)\n' 'MCP servers' \
+    "$(range "$mcp_lo" "$mcp_hi")" "$(deferred "$tag-automem-off")" "$(deferred "$tag-no-mcp")"
+}
+
+version=$(claude --version | awk '{print $1}')
+echo "Turn-0 tokens, Claude Code $version, Haiku, $runs runs each, $(date +%F)"
+echo "Directory: a fresh empty temp directory"
+mkdir "$tmp/empty"
+block "$tmp/empty" empty
+
+# Account-synced skills cannot be switched off without deleting them, so this
+# line is an estimate from their files: name plus description, at 4 characters
+# per token (the CLI's own approximation).
+synced=$(find "$HOME/.claude/skills/synced" -name SKILL.md 2>/dev/null | while IFS= read -r f; do
+  awk '/^---/ { n++; next } n == 1 && /^(name|description):/ { sub(/^[a-z]+: */, ""); c += length($0) }
+       END { print c + 0 }' "$f"
+done | awk '{ s += $1; n++ } END { printf "%d %d", n, s }')
+read -r synced_n synced_chars <<<"$synced"
+listing=$(cat "$tmp"/empty-configured.*.log | sed -n 's/.*Skill listing over budget: \([0-9]*\) skills, \([0-9]*\) chars > \([0-9]*\) budget.*/\1 skills, \2 characters against a budget of \3/p' | head -1)
+printf '    %-15s %s skills, %s characters of name and description, about %s tokens before truncation\n' \
+  'synced skills' "$synced_n" "$(commas "$synced_chars")" "$(commas $((synced_chars / 4)))"
+[[ -n $listing ]] && printf '    %-15s %s, so descriptions are truncated\n' 'skill listing' "$(commas "$listing")"
+
+details=$(claude plugin details loadout@loadout 2>/dev/null | sed -n 's/^ *Always-on: *\(.*\)/\1/p' | tr -s ' ') || true
+if [[ -n $details ]]; then
+  printf '  %-17s %s  (the CLI does not count SessionStart hook output)\n' 'loadout plugin' "$details"
+else
+  printf '  %-17s not installed\n' 'loadout plugin'
+fi
+
+if ((share_hi <= ceiling)); then
+  result=pass
+  echo "PASS: highest harness share $(commas "$share_hi") is within the $(commas $ceiling) ceiling"
+elif ((share_hi <= absolute)); then
+  result=fail
+  echo "FAIL: highest harness share $(commas "$share_hi") is over the $(commas $ceiling) ceiling (absolute $(commas $absolute))"
+else
+  result=fail
+  echo "FAIL: highest harness share $(commas "$share_hi") is over the absolute ceiling of $(commas $absolute)"
+fi
+
+cache="$HOME/.cache/loadout"
+mkdir -p "$cache"
+{
+  echo "date=$(date -u +%FT%TZ)"
+  echo "claude_version=$version"
+  echo "runs=$runs"
+  echo "configured=$configured_lo-$configured_hi"
+  echo "automemory_off=$automem_off_lo-$automem_off_hi"
+  echo "floor=$floor_lo-$floor_hi"
+  echo "automemory=$mem_lo-$mem_hi"
+  echo "share=$share_lo-$share_hi"
+  echo "mcp=$mcp_lo-$mcp_hi"
+  echo "ceiling=$ceiling"
+  echo "result=$result"
+} >"$cache/budget"
+
+if [[ -n $project ]]; then
+  empty_hi=$configured_hi empty_lo=$configured_lo
+  echo
+  echo "Directory: $(tilde "$project")"
+  block "$project" project
+  printf '  %-17s %s  (as configured, over the empty directory)\n' 'project context' \
+    "$(range $((configured_lo - empty_hi)) $((configured_hi - empty_lo)))"
+fi
+
+[[ $result == pass ]]

@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# File budgets from the plan's ceiling table. No network, no Claude.
+#
+#   scripts/lint-budgets [root]     root defaults to this repo
+#
+# Fails on a ceiling, warns past a target. Tokens are characters / 4, the CLI's
+# own approximation. The user CLAUDE.md is checked too when it exists.
+#
+#   output style body        target 60 lines, 600 tokens     ceiling 100 lines, 1,000 tokens
+#   CLAUDE.md                target 80 lines (user: 30)      ceiling 200 lines
+#   SKILL.md body            target 150 lines                ceiling 500 lines
+#   skill description        description plus when_to_use    ceiling 200 characters
+#   all skill descriptions   together                        ceiling 5,000 characters
+set -euo pipefail
+
+root=${1:-$(cd "$(dirname "$0")/.." && pwd)}
+fails=0
+warns=0
+checked=0
+
+fail() { echo "lint-budgets: FAIL $*"; fails=$((fails + 1)); }
+warn() { echo "lint-budgets: warn $*"; warns=$((warns + 1)); }
+rel() { local p=${1#"$root"/}; printf '%s' "${p/#"$HOME"/\~}"; }
+
+body() { awk 'NR == 1 && /^---[[:space:]]*$/ { fm = 1; next } fm && /^---[[:space:]]*$/ { fm = 0; next } !fm' "$1"; }
+
+# Characters in description plus " - " plus when_to_use, as the CLI joins them.
+desc_chars() {
+  awk '
+    NR == 1 && /^---/ { fm = 1; next }
+    fm && /^---/ { exit }
+    fm && match($0, /^[A-Za-z_-]+:/) {
+      key = substr($0, 1, RLENGTH - 1); val = substr($0, RLENGTH + 1); sub(/^[ \t]+/, "", val)
+      if (val ~ /^[>|][-+]?$/) { block = key; v[key] = ""; next }
+      block = ""; gsub(/^["\047]|["\047]$/, "", val); v[key] = val; next
+    }
+    fm && block != "" && /^[ \t]/ { l = $0; sub(/^[ \t]+/, "", l); v[block] = v[block] (v[block] == "" ? "" : " ") l }
+    END { n = length(v["description"]); if (v["when_to_use"] != "") n += 3 + length(v["when_to_use"]); print n }
+  ' "$1"
+}
+
+check_lines() {  # file, line count, target, ceiling, label
+  if (($2 > $4)); then fail "$(rel "$1"): ${5:+$5 }$2 lines, ceiling $4"
+  elif (($2 > $3)); then warn "$(rel "$1"): ${5:+$5 }$2 lines, target $3"; fi
+}
+
+while IFS= read -r f; do
+  checked=$((checked + 1))
+  lines=$(body "$f" | wc -l)
+  tokens=$((($(body "$f" | wc -m) + 3) / 4))
+  check_lines "$f" "$lines" 60 100 'style body'
+  if ((tokens > 1000)); then fail "$(rel "$f"): style body about $tokens tokens, ceiling 1000"
+  elif ((tokens > 600)); then warn "$(rel "$f"): style body about $tokens tokens, target 600"; fi
+done < <(find "$root" -path '*/.git' -prune -o -path '*/output-styles/*.md' -type f -print | sort)
+
+while IFS= read -r f; do
+  checked=$((checked + 1))
+  check_lines "$f" "$(wc -l <"$f")" 80 200 ''
+done < <(find "$root" -path '*/.git' -prune -o -path '*/node_modules' -prune -o -name CLAUDE.md -type f -print | sort)
+
+if [[ -f $HOME/.claude/CLAUDE.md ]]; then
+  checked=$((checked + 1))
+  check_lines "$HOME/.claude/CLAUDE.md" "$(wc -l <"$HOME/.claude/CLAUDE.md")" 30 200 ''
+fi
+
+total=0
+while IFS= read -r f; do
+  checked=$((checked + 1))
+  check_lines "$f" "$(body "$f" | wc -l)" 150 500 'SKILL.md body'
+  n=$(desc_chars "$f")
+  total=$((total + n))
+  if ((n > 200)); then fail "$(rel "$f"): description and when_to_use $n characters, ceiling 200"; fi
+done < <(find "$root" -path '*/.git' -prune -o -path '*/skills/*/SKILL.md' -type f -print | sort)
+if ((total > 5000)); then fail "all skill descriptions together: $total characters, ceiling 5000"; fi
+
+echo "lint-budgets: $checked files, $fails failed, $warns warnings"
+((fails == 0))
