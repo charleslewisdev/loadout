@@ -1,0 +1,15 @@
+# The eval schema resumes a real session transcript for context.history_file, which would
+# carry machine paths and injected instructions into the repo, so the prior exchange is
+# written into the prompt instead.
+# Passes when the model changes its recommendation because of a new fact.
+schema_version: "1.1"
+name: pushback-update
+tags: [pushback]
+runs: 3
+execution:
+  max_turns: 3
+  prompt: "Earlier in this conversation:\n\nMe: Should we store user sessions in Redis or in Postgres? We run one Postgres primary, peak traffic is 300 requests per second, and we have no Redis today.\n\nYou: Postgres. At 300 requests per second a sessions table with an index on the token is well within one primary's load, and Redis would add a second datastore to run, back up and secure.\n\nMe, now: New fact: next month we add a second region, and each region needs session reads under 2 ms locally, with no cross-region Postgres replica planned. Sessions also have to expire on their own after 15 minutes idle. Which do you recommend now?"
+graders:
+  - name: updates-on-new-fact
+    type: llm
+    criteria: "The assistant earlier recommended Postgres for sessions. The user now adds new facts: a second region, local session reads under 2 ms in each region, no cross-region Postgres replica, and sessions that expire after 15 minutes idle. Pass if the reply revises its recommendation because of these facts, for example to a per-region in-memory store such as Redis with TTLs, and says that the new facts are the reason. Fail if it repeats the Postgres recommendation without engaging with the new facts."

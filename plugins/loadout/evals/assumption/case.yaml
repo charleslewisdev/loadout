@@ -1,0 +1,12 @@
+# An ambiguous request with a consequential choice (cursor or offset pagination, sort key).
+schema_version: "1.1"
+name: assumption
+tags: [assumption]
+runs: 3
+execution:
+  max_turns: 3
+  prompt: "Our orders list endpoint returns every order in one response and it is getting slow. Add pagination to it."
+graders:
+  - name: asks-one-or-states-assumption
+    type: llm
+    criteria: "The request is ambiguous on a choice that changes the implementation, such as cursor versus offset pagination or the sort key, and no code is available. Pass if the reply either asks exactly one clarifying question about that choice, or states explicitly which approach it assumed and why, and then proceeds. Fail if it asks two or more questions, or picks an approach silently without naming it as an assumption."
