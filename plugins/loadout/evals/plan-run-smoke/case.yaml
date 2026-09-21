@@ -1,0 +1,30 @@
+# Smoke case for plan-run: a written plan is carried out with one fresh subagent
+# per task. Run with --scaffold --allow-tools Write Edit. The plan's checks read
+# files, because Bash fails at sandbox setup inside eval runs on some machines.
+schema_version: "1.1"
+name: plan-run-smoke
+tags: [smoke, plan-run]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 30
+  timeout_seconds: 600
+  allowed_tools: [Skill, Read, Glob, Grep, Write, Edit, Agent]
+  prompt: "Execute the plan in docs/plans/two-helpers.md."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: plan-run
+    arm: with-only
+  - name: subagent-per-task
+    type: tool_used
+    tool: Agent
+    min: 2
+  - name: slugify-written
+    type: file_exists
+    path: src/text_utils.py
+  - name: clamp-written
+    type: file_exists
+    path: src/math_utils.py
