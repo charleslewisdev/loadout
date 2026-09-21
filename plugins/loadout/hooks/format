@@ -11,7 +11,8 @@
 file=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [ -f "$file" ] || exit 0
 dir=$(cd "$(dirname "$file")" && pwd -P) || exit 0
-root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || root=/
+# Outside a repository there is no boundary to stop the walk-up, so do nothing.
+root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || exit 0
 
 # find_up <test command...>: the first directory from $dir up to $root where the test passes
 find_up() {
