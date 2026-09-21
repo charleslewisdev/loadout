@@ -9,10 +9,13 @@
 # sessions count: print-mode runs (entrypoint sdk-*), such as evals and
 # scripts/budget, are reported as excluded.
 #
-# Skips every project directory and transcript that matches the identity guard's
-# denylist, and refuses to run without it. Before matching, the home path is
-# replaced by ~, and attachment records are dropped: they hold the injected user
-# CLAUDE.md, which names the private vocabulary in every session.
+# Refuses to run without the identity guard's denylist. A project directory whose
+# name matches it is skipped whole; inside a transcript, every record that matches
+# is withheld and the rest is counted. The script prints numbers only, so it cannot
+# copy a private string; scripts that copy text skip whole transcripts instead.
+# Before matching, the home path is replaced by ~, and attachment records are
+# dropped: they hold the injected user CLAUDE.md, which names the private
+# vocabulary in every session.
 set -euo pipefail
 
 days=${1:-14}
@@ -33,7 +36,9 @@ if [[ ! -s $tmp/deny ]] || ((rc > 1)); then
   exit 2
 fi
 
-scanned=0 skipped=0 printmode=0 with_reads=0 reads=0
+# Auto-memory paths as they read after the home path becomes ~.
+memory_re="$(sed 's/[][\.*^$()+?{}|]/\\&/g' <<<"${projects/#"$HOME"/\~}")/[^/]+/memory(/|\$)"
+scanned=0 skipped=0 printmode=0 withheld=0 partial=0 with_reads=0 reads=0
 : >"$tmp/per-session"
 for dir in "$projects"/*/; do
   name=$(basename "$dir")
@@ -50,16 +55,18 @@ for dir in "$projects"/*/; do
     # A corrupt or half-written line ends the conversation early; only what was
     # parsed is matched and counted.
     { jq -c 'select(.type != "attachment")' "$t" 2>/dev/null || true; } |
-      sed -e "s|$HOME|~|g" -e "s|$enc|~|g" >"$tmp/conversation"
-    if grep -q -i -E -f "$tmp/deny" "$tmp/conversation"; then
-      skipped=$((skipped + 1))
-      continue
+      sed -e "s|$HOME|~|g" -e "s|$enc|~|g" >"$tmp/records"
+    grep -v -i -E -f "$tmp/deny" "$tmp/records" >"$tmp/conversation" || true
+    dropped=$(($(wc -l <"$tmp/records") - $(wc -l <"$tmp/conversation")))
+    if ((dropped > 0)); then
+      withheld=$((withheld + dropped))
+      partial=$((partial + 1))
     fi
     scanned=$((scanned + 1))
     n=$(jq -r 'select(.type == "assistant") | .message.content[]?
           | select(.type == "tool_use" and (.name == "Read" or .name == "Grep"))
           | .input.file_path // .input.path // empty' "$tmp/conversation" 2>/dev/null |
-      grep -c -E '\.claude/projects/[^/]+/memory(/|$)' || true)
+      grep -c -E "$memory_re" || true)
     echo "$n" >>"$tmp/per-session"
     if ((n > 0)); then
       with_reads=$((with_reads + 1))
@@ -70,7 +77,8 @@ done
 
 echo "Auto-memory reads, last $days days, $(date +%F)"
 echo "  sessions scanned            $scanned"
-echo "  sessions skipped (denylist) $skipped"
+echo "  sessions in skipped dirs    $skipped"
+echo "  records withheld (denylist) $withheld, from $partial sessions"
 echo "  print-mode runs excluded    $printmode"
 echo "  sessions with a memory read $with_reads"
 echo "  Read and Grep calls         $reads"
