@@ -59,11 +59,18 @@ names_allowed() {
   return $ok
 }
 
+statusline_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(plugins/loadout/statusline/statusline.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep '✗' <<<"$out"
+  return "$rc"
+}
+
 step 'budget lint' scripts/lint-budgets
 step 'every plugin has evals' evals_present
 step 'identity and secret scan, full history' guard/scan --all
 step 'forbidden names' names_allowed
-step 'statusline tests' bash -c 'plugins/loadout/statusline/statusline.test.sh >/dev/null || plugins/loadout/statusline/statusline.test.sh | grep "✗"'
+step 'statusline tests' statusline_tests
 ((ci)) || step 'claude plugin validate' claude plugin validate .
 
 if ((${#failed[@]})); then

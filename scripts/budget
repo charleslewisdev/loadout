@@ -131,7 +131,11 @@ if [[ -d $HOME/.claude/skills/synced ]]; then
     awk '{ s += $1; n++ } END { printf "%d %d", n, s }')
 fi
 read -r synced_n synced_chars <<<"$synced"
-listing=$(cat "$tmp"/empty-configured.*.log | sed -n 's/.*Skill listing over budget: \([0-9]*\) skills, \([0-9]*\) chars > \([0-9]*\) budget.*/\1 skills, \2 characters against a budget of \3/p' | head -1)
+read -r listing_skills listing_chars listing_budget < <(cat "$tmp"/empty-configured.*.log |
+  sed -n 's/.*Skill listing over budget: \([0-9]*\) skills, \([0-9]*\) chars > \([0-9]*\) budget.*/\1 \2 \3/p' |
+  awk 'NR == 1') || true
+listing=''
+[[ -n ${listing_budget:-} ]] && listing="$listing_skills skills, $listing_chars characters against a budget of $listing_budget"
 printf '    %-15s %s skills, %s characters of description and when_to_use, about %s tokens before truncation\n' \
   'synced skills' "$synced_n" "$(commas "$synced_chars")" "$(commas $((synced_chars / 4)))"
 [[ -n $listing ]] && printf '    %-15s %s, so descriptions are truncated\n' 'skill listing' "$(commas "$listing")"
@@ -154,7 +158,7 @@ else
   echo "FAIL: highest harness share $(commas "$share_hi") is over the absolute ceiling of $(commas $absolute)"
 fi
 
-cache="$HOME/.cache/loadout"
+cache="${LOADOUT_CACHE:-$HOME/.cache/loadout}"
 mkdir -p "$cache"
 {
   echo "date=$(date -u +%FT%TZ)"
@@ -168,7 +172,7 @@ mkdir -p "$cache"
   echo "share=$share_lo-$share_hi"
   echo "mcp=$mcp_lo-$mcp_hi"
   echo "ceiling=$ceiling"
-  cat "$tmp"/empty-configured.*.log | sed -n 's/.*Skill listing over budget: \([0-9]*\) skills, \([0-9]*\) chars > \([0-9]*\) budget.*/listing_skills=\1\nlisting_chars=\2\nlisting_budget=\3/p' | awk 'NR <= 3'
+  [[ -n $listing ]] && printf 'listing_skills=%s\nlisting_chars=%s\nlisting_budget=%s\n' "$listing_skills" "$listing_chars" "$listing_budget"
   echo "result=$result"
 } >"$cache/budget"
 
