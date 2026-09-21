@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# The commit message against the denylist and secret patterns.
+exec "$(git rev-parse --show-toplevel)/guard/scan" msg "$1"

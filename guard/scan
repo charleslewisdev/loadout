@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# Identity and secret guard. Scans text headed for git history.
+#
+#   guard/scan diff          staged changes plus the author and committer identity
+#   guard/scan range <revs>  commits in a git log range: diffs, messages, emails
+#   guard/scan --all         every commit on every ref
+#   guard/scan msg <file>    a commit message
+#
+# Three checks: the private denylist (never in this repo), secret patterns, and
+# author emails against guard/allowed-emails. Findings name a location and a
+# denylist line number, never the matched text. Exit 0 clean, 1 findings, 2 error.
+#
+# GUARD_DENYLIST            denylist path (default ~/.config/loadout-guard/denylist)
+# GUARD_REQUIRE_DENYLIST=1  a missing denylist is a finding, not a skipped check
+set -euo pipefail
+
+root=$(git rev-parse --show-toplevel)
+allowed="$root/guard/allowed-emails"
+deny="${GUARD_DENYLIST:-$HOME/.config/loadout-guard/denylist}"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+findings="$tmp/findings"
+: >"$findings"
+
+secrets=(
+  'AKIA[0-9A-Z]{16}'
+  'gh[pousr]_[A-Za-z0-9]{36,}'
+  'github_pat_[A-Za-z0-9_]{40,}'
+  'sk-ant-[A-Za-z0-9_-]{20,}'
+  'sk-(proj-)?[A-Za-z0-9_-]{40,}'
+  'xox[abposr]-[A-Za-z0-9-]{10,}'
+  'AIza[0-9A-Za-z_-]{35}'
+  'glpat-[A-Za-z0-9_-]{20,}'
+  '-----BEGIN ([A-Z]+ )?PRIVATE KEY-----'
+)
+printf '%s\n' "${secrets[@]}" >"$tmp/secrets"
+
+finding() { printf 'guard: %s\n' "$*" >>"$findings"; }
+tilde() { printf '%s' "${1/#"$HOME"/\~}"; }
+
+if [[ -r $deny ]]; then
+  grep -v -e '^[[:space:]]*$' "$deny" >"$tmp/deny"
+else
+  : >"$tmp/deny"
+  if [[ ${GUARD_REQUIRE_DENYLIST:-0} == 1 ]]; then
+    finding "denylist missing at $(tilde "$deny")"
+  else
+    echo "guard: denylist missing at $(tilde "$deny"); vocabulary check skipped" >&2
+  fi
+fi
+
+# Unified diff (optionally with commit and message markers) to two parallel
+# files: text holds each added line or path, where holds its location.
+records() {
+  awk -v T="$tmp/text" -v W="$tmp/where" '
+    function emit(s) { print s > T; print c ":" p ":" n > W }
+    BEGIN { c = "staged" }
+    /^\001COMMIT / { c = substr($2, 1, 10); m = 1; p = "(message)"; n = 0; next }
+    /^\001ENDMSG/  { m = 0; next }
+    m { n++; emit($0); next }
+    /^diff --(git|cc|combined) / { w = 0; next }
+    /^--- / { next }
+    /^\+\+\+ / { p = substr($0, 5); sub(/^b\//, "", p); n = 0; if (p != "/dev/null") emit(p); next }
+    /^@@/ { match($0, /^@+/); w = RLENGTH - 1
+            match($0, / \+[0-9]+/); n = substr($0, RSTART + 2, RLENGTH - 2) + 0; next }
+    w && substr($0, 1, w) ~ /\+/ && substr($0, 1, w) !~ /-/ { emit(substr($0, w + 1)); n++; next }
+  '
+}
+
+check_records() {
+  [[ -s $tmp/text ]] || return 0
+  local n line i pat hit
+  if [[ -s $tmp/deny ]]; then
+    while IFS=: read -r n _; do
+      line=$(sed -n "${n}p" "$tmp/text")
+      hit='?'
+      while IFS=: read -r i pat; do
+        if grep -q -a -i -E -e "$pat" <<<"$line"; then hit=$i; break; fi
+      done < <(grep -n -v -e '^[[:space:]]*$' "$deny")
+      finding "denylist line $hit matches at $(sed -n "${n}p" "$tmp/where")"
+    done < <(grep -n -a -i -E -f "$tmp/deny" "$tmp/text" || true)
+  fi
+  while IFS=: read -r n _; do
+    finding "secret pattern matches at $(sed -n "${n}p" "$tmp/where")"
+  done < <(grep -n -a -E -f "$tmp/secrets" "$tmp/text" || true)
+}
+
+email_ok() { grep -q -i -x -F -e "$1" "$allowed"; }
+
+check_emails() {  # git log arguments
+  local c ae ce
+  while IFS=$'\t' read -r c ae ce; do
+    email_ok "$ae" || finding "author email of commit ${c:0:10} is not in guard/allowed-emails"
+    email_ok "$ce" || finding "committer email of commit ${c:0:10} is not in guard/allowed-emails"
+  done < <(git log --format='%H%x09%ae%x09%ce' "$@")
+}
+
+log_records() {  # git log arguments
+  git log --no-color --no-ext-diff --text -p --cc -U0 --src-prefix=a/ --dst-prefix=b/ \
+    --format='format:%x01COMMIT %H%n%B%n%x01ENDMSG' "$@" | records
+}
+
+case "${1:-}" in
+  diff)
+    git diff --cached --no-color --no-ext-diff --text -U0 --src-prefix=a/ --dst-prefix=b/ | records
+    check_records
+    for who in AUTHOR COMMITTER; do
+      email=$(git var "GIT_${who}_IDENT" 2>/dev/null | sed -n 's/.*<\(.*\)>.*/\1/p') || email=''
+      email_ok "$email" || finding "the ${who,,} email for this commit is not in guard/allowed-emails"
+    done
+    ;;
+  range)
+    shift
+    [[ $# -gt 0 ]] || { echo "usage: guard/scan range <revs>" >&2; exit 2; }
+    log_records "$@"
+    check_records
+    check_emails "$@"
+    ;;
+  --all)
+    log_records --all
+    check_records
+    check_emails --all
+    ;;
+  msg)
+    [[ -r ${2:-} ]] || { echo "usage: guard/scan msg <file>" >&2; exit 2; }
+    { printf '\001COMMIT message\n'; cat "$2"; printf '\n\001ENDMSG\n'; } | records
+    check_records
+    ;;
+  *)
+    sed -n '2,10s/^# \{0,1\}//p' "$0" >&2
+    exit 2
+    ;;
+esac
+
+if [[ -s $findings ]]; then
+  cat "$findings" >&2
+  exit 1
+fi
