@@ -29,7 +29,7 @@ step() {  # label, command...
 evals_present() {
   local d ok=0
   for d in plugins/*/; do
-    if ! find "$d" -path '*/evals/*' -name case.yaml | grep -q .; then
+    if [[ -z $(find "$d" -path '*/evals/*' -name case.yaml -print -quit) ]]; then
       echo "${d%/} has no evals/**/case.yaml"
       ok=1
     fi
@@ -38,11 +38,16 @@ evals_present() {
 }
 
 names_allowed() {
-  local ok=0 name
+  local ok=0 name rc
   while IFS= read -r name; do
-    if grep -q -i -E -f <(grep -v -e '^#' -e '^[[:space:]]*$' guard/forbidden-names) <<<"$name"; then
+    rc=0
+    grep -q -i -E -f <(grep -v -e '^#' -e '^[[:space:]]*$' guard/forbidden-names) <<<"$name" || rc=$?
+    if ((rc == 0)); then
       echo "forbidden word in name: $name"
       ok=1
+    elif ((rc > 1)); then
+      echo "guard/forbidden-names holds an invalid pattern"
+      return 1
     fi
   done < <(
     find plugins -mindepth 1 -maxdepth 1 -type d -printf '%f\n'

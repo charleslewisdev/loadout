@@ -5,17 +5,25 @@
 #
 # Runs the command with this script's stdin, stdout and stderr, exits with its
 # status, and appends "name,start,end" in $EPOCHREALTIME seconds to
-# ~/.claude/hook-latency.log (HOOK_LATENCY_LOG overrides). scripts/hook-report
-# prints p50, p95 and max per hook.
+# ~/.claude/hook-latency.log (HOOK_LATENCY_LOG overrides). A run stopped by a
+# signal, such as the hook timeout, is logged with a fourth field, "killed".
+# scripts/hook-report prints p50, p95 and max per hook.
 if [[ $# -lt 3 || $2 != -- ]]; then
   echo "usage: hook-timed <name> -- <command> [args]" >&2
   exit 2
 fi
 name=$1
 shift 2
+log=${HOOK_LATENCY_LOG:-$HOME/.claude/hook-latency.log}
 start=$EPOCHREALTIME
-"$@"
+child=''
+record() { printf '%s,%s,%s%s\n' "$name" "$start" "$EPOCHREALTIME" "${1:+,$1}" 2>/dev/null >>"$log"; }
+trap 'record killed; [[ -n $child ]] && kill "$child" 2>/dev/null; exit 143' TERM INT HUP
+# In the background, so a signal reaches the trap at once: bash defers traps while
+# a foreground child runs. <&0 keeps stdin, which a background job would lose.
+"$@" <&0 &
+child=$!
+wait "$child"
 status=$?
-end=$EPOCHREALTIME
-printf '%s,%s,%s\n' "$name" "$start" "$end" >>"${HOOK_LATENCY_LOG:-$HOME/.claude/hook-latency.log}" 2>/dev/null
+record
 exit $status

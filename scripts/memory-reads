@@ -25,7 +25,13 @@ fi
 enc=${HOME//\//-}
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-grep -v -e '^[[:space:]]*$' "$deny" >"$tmp/deny"
+grep -v -e '^[[:space:]]*$' "$deny" >"$tmp/deny" || true
+rc=0
+grep -E -f "$tmp/deny" /dev/null || rc=$?
+if [[ ! -s $tmp/deny ]] || ((rc > 1)); then
+  echo "memory-reads: the denylist is empty or holds an invalid pattern; refusing to read transcripts" >&2
+  exit 2
+fi
 
 scanned=0 skipped=0 printmode=0 with_reads=0 reads=0
 : >"$tmp/per-session"
@@ -41,7 +47,9 @@ for dir in "$projects"/*/; do
       printmode=$((printmode + 1))
       continue
     fi
-    jq -c 'select(.type != "attachment")' "$t" 2>/dev/null |
+    # A corrupt or half-written line ends the conversation early; only what was
+    # parsed is matched and counted.
+    { jq -c 'select(.type != "attachment")' "$t" 2>/dev/null || true; } |
       sed -e "s|$HOME|~|g" -e "s|$enc|~|g" >"$tmp/conversation"
     if grep -q -i -E -f "$tmp/deny" "$tmp/conversation"; then
       skipped=$((skipped + 1))

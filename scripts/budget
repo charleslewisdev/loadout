@@ -39,7 +39,7 @@ cleanup() {
   local d
   for d in "$tmp/empty" ${project:+"$project"}; do
     d="$projects/$(sed 's|[/.]|-|g' <<<"$d")"
-    [[ $d == "$projects/-tmp-"* ]] && rmdir "$d/memory" "$d" 2>/dev/null
+    if [[ $d == "$projects/-tmp-"* ]]; then rmdir "$d/memory" "$d" 2>/dev/null || true; fi
   done
   rm -rf "$tmp"
 }
@@ -123,15 +123,16 @@ mkdir "$tmp/empty"
 block "$tmp/empty" empty
 
 # Account-synced skills cannot be switched off without deleting them, so this
-# line is an estimate from their files: name plus description, at 4 characters
-# per token (the CLI's own approximation).
-synced=$(find "$HOME/.claude/skills/synced" -name SKILL.md 2>/dev/null | while IFS= read -r f; do
-  awk '/^---/ { n++; next } n == 1 && /^(name|description):/ { sub(/^[a-z]+: */, ""); c += length($0) }
-       END { print c + 0 }' "$f"
-done | awk '{ s += $1; n++ } END { printf "%d %d", n, s }')
+# line is an estimate from their files: description plus when_to_use, at 4
+# characters per token (the CLI's own approximation).
+synced='0 0'
+if [[ -d $HOME/.claude/skills/synced ]]; then
+  synced=$(find "$HOME/.claude/skills/synced" -name SKILL.md -exec "$(dirname "$0")/desc-chars" {} + |
+    awk '{ s += $1; n++ } END { printf "%d %d", n, s }')
+fi
 read -r synced_n synced_chars <<<"$synced"
 listing=$(cat "$tmp"/empty-configured.*.log | sed -n 's/.*Skill listing over budget: \([0-9]*\) skills, \([0-9]*\) chars > \([0-9]*\) budget.*/\1 skills, \2 characters against a budget of \3/p' | head -1)
-printf '    %-15s %s skills, %s characters of name and description, about %s tokens before truncation\n' \
+printf '    %-15s %s skills, %s characters of description and when_to_use, about %s tokens before truncation\n' \
   'synced skills' "$synced_n" "$(commas "$synced_chars")" "$(commas $((synced_chars / 4)))"
 [[ -n $listing ]] && printf '    %-15s %s, so descriptions are truncated\n' 'skill listing' "$(commas "$listing")"
 

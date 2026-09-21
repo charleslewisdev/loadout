@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Characters of a SKILL.md's description plus " - " plus when_to_use, the way the
+# CLI joins them for the skill listing. Handles plain, quoted, folded (>) and
+# literal (|) YAML scalars, including plain scalars continued on indented lines.
+#
+#   scripts/desc-chars <SKILL.md>...    prints "<characters> <file>" per file
+set -euo pipefail
+
+[[ $# -gt 0 ]] || { sed -n '2,6s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+for f in "$@"; do
+  awk '
+    NR == 1 && /^---/ { fm = 1; next }
+    fm && /^---/ { exit }
+    fm && match($0, /^[A-Za-z_-]+:/) {
+      key = substr($0, 1, RLENGTH - 1); val = substr($0, RLENGTH + 1); sub(/^[ \t]+/, "", val)
+      block = key
+      if (val ~ /^[>|][-+]?$/) { v[key] = ""; next }
+      gsub(/^["\047]|["\047]$/, "", val); v[key] = val; next
+    }
+    fm && block != "" && /^[ \t]/ { l = $0; sub(/^[ \t]+/, "", l); sub(/["\047]$/, "", l); v[block] = v[block] (v[block] == "" ? "" : " ") l }
+    END { n = length(v["description"]); if (v["when_to_use"] != "") n += 3 + length(v["when_to_use"]); print n }
+  ' "$f" | tr -d '\n'
+  printf ' %s\n' "$f"
+done

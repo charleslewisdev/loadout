@@ -14,7 +14,8 @@
 #   hooks.json               every command runs through scripts/hook-timed
 set -euo pipefail
 
-root=${1:-$(cd "$(dirname "$0")/.." && pwd)}
+here=$(cd "$(dirname "$0")" && pwd)
+root=${1:-$(cd "$here/.." && pwd)}
 fails=0
 warns=0
 checked=0
@@ -24,21 +25,6 @@ warn() { echo "lint-budgets: warn $*"; warns=$((warns + 1)); }
 rel() { local p=${1#"$root"/}; printf '%s' "${p/#"$HOME"/\~}"; }
 
 body() { awk 'NR == 1 && /^---[[:space:]]*$/ { fm = 1; next } fm && /^---[[:space:]]*$/ { fm = 0; next } !fm' "$1"; }
-
-# Characters in description plus " - " plus when_to_use, as the CLI joins them.
-desc_chars() {
-  awk '
-    NR == 1 && /^---/ { fm = 1; next }
-    fm && /^---/ { exit }
-    fm && match($0, /^[A-Za-z_-]+:/) {
-      key = substr($0, 1, RLENGTH - 1); val = substr($0, RLENGTH + 1); sub(/^[ \t]+/, "", val)
-      if (val ~ /^[>|][-+]?$/) { block = key; v[key] = ""; next }
-      block = ""; gsub(/^["\047]|["\047]$/, "", val); v[key] = val; next
-    }
-    fm && block != "" && /^[ \t]/ { l = $0; sub(/^[ \t]+/, "", l); v[block] = v[block] (v[block] == "" ? "" : " ") l }
-    END { n = length(v["description"]); if (v["when_to_use"] != "") n += 3 + length(v["when_to_use"]); print n }
-  ' "$1"
-}
 
 check_lines() {  # file, line count, target, ceiling, label
   if (($2 > $4)); then fail "$(rel "$1"): ${5:+$5 }$2 lines, ceiling $4"
@@ -68,19 +54,33 @@ total=0
 while IFS= read -r f; do
   checked=$((checked + 1))
   check_lines "$f" "$(body "$f" | wc -l)" 150 500 'SKILL.md body'
-  n=$(desc_chars "$f")
+  n=$("$here/desc-chars" "$f" | cut -d' ' -f1)
   total=$((total + n))
   if ((n > 200)); then fail "$(rel "$f"): description and when_to_use $n characters, ceiling 200"; fi
 done < <(find "$root" -path '*/.git' -prune -o -path '*/skills/*/SKILL.md' -type f -print | sort)
 if ((total > 5000)); then fail "all skill descriptions together: $total characters, ceiling 5000"; fi
 
 wrapper='^"?\$\{CLAUDE_PLUGIN_ROOT\}/scripts/hook-timed"? '
+lint_hooks() {  # file, jq path to the hooks object
+  local cmd
+  if ! jq -e "$2 | objects" "$1" >/dev/null 2>&1; then
+    jq empty "$1" >/dev/null 2>&1 || fail "$(rel "$1"): not valid JSON"
+    return 0
+  fi
+  while IFS= read -r cmd; do
+    [[ $cmd =~ $wrapper ]] || fail "$(rel "$1"): hook command bypasses scripts/hook-timed: $cmd"
+  done < <(jq -r "$2 | .[][] | .hooks[]? | select(.type == \"command\") | .command" "$1")
+}
 while IFS= read -r f; do
   checked=$((checked + 1))
-  while IFS= read -r cmd; do
-    [[ $cmd =~ $wrapper ]] || fail "$(rel "$f"): hook command bypasses scripts/hook-timed: $cmd"
-  done < <(jq -r '.hooks // {} | .[][] | .hooks[]? | select(.type == "command") | .command' "$f")
+  lint_hooks "$f" '.hooks'
 done < <(find "$root" -path '*/.git' -prune -o -path '*/hooks/hooks.json' -type f -print | sort)
+# Hooks declared inline in a plugin manifest get the same rule.
+while IFS= read -r f; do
+  checked=$((checked + 1))
+  jq empty "$f" >/dev/null 2>&1 || { fail "$(rel "$f"): not valid JSON"; continue; }
+  lint_hooks "$f" '.hooks'
+done < <(find "$root" -path '*/.git' -prune -o -path '*/.claude-plugin/plugin.json' -type f -print | sort)
 
 echo "lint-budgets: $checked files, $fails failed, $warns warnings"
 ((fails == 0))
