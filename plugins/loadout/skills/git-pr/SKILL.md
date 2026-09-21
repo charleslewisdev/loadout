@@ -61,5 +61,5 @@ The description is published under the author's name, so it follows their public
    2. Merge into the base branch locally
    3. Keep the branch as it is
    4. Discard the work
-4. Do what was chosen. Discarding needs the author to confirm by typing the branch name, because it deletes commits.
-5. After a merge, a pull request or a discard, remove the branch's worktree if one exists. Keep it for option 3.
+4. Do what was chosen. Discarding needs the author to confirm by typing the branch name, because it deletes commits; remove the branch's worktree first, since git refuses to delete a branch checked out in one.
+5. After a merge or a pull request, remove the branch's worktree if one exists. Keep it for option 3.

@@ -6,4 +6,4 @@ Judge whether the tests prove the change, and whether failures stay visible.
 - Look for tests that cannot fail: assertions on mocks alone, a condition that is always true, a caught exception that passes the test.
 - Look for failures swallowed in the changed code: empty `except` or `catch`, errors logged and dropped, a fallback value that hides a broken input.
 
-Return each finding as: file and line, the gap in one sentence, and the input or state that would slip through.
+Return each finding as: file and line, the gap in one sentence, and the input or state that would slip through, and a severity: Blocking, Should fix or Consider.

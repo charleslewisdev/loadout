@@ -34,11 +34,11 @@ When the diff calls for it:
 - security, when the change touches input handling, authentication, secrets, file or network access, or dependencies: run the built-in `/security-review`
 - `reviewers/ux.md`, when the change touches UI or user-facing text
 
-Each reviewer returns findings as: file and line, what is wrong, the concrete input or state that makes it fail, and its evidence.
+Each reviewer returns findings as: file and line, what is wrong, the concrete input or state that makes it fail, its evidence, and a severity from stage 4 (Blocking, Should fix, Consider).
 
 ## 3. Verify every finding
 
-Send the findings, one per subagent in parallel, to a verifier with `reviewers/verifier.md`. It scores each from 0 to 100 on that rubric and checks the evidence itself. Drop every finding under 80. Merge duplicates, keeping the strongest evidence.
+First merge duplicates across reviewers, keeping the strongest evidence and the highest severity. Then send the findings to verifiers with `reviewers/verifier.md`, a few findings per verifier and the verifiers in parallel. Each finding gets a score from 0 to 100 on that rubric, checked on the verifier's own evidence. Drop findings under 80, except a finding confirmed against a rule its CLAUDE.md states: the rubric puts those at 75, so keep them at 75 and above.
 
 ## 4. Report
 
@@ -50,4 +50,4 @@ Group what is left by severity:
 
 For each: file and line, the failure in one sentence, and the evidence. Then list the checks from stage 1 with their results, and the reviewers that ran. If nothing survived verification, say so and name what was checked.
 
-Keep each finding's severity as the reviewers and the verifier set it. Add your own view after the list, never in place of it. Ask before posting anything to a pull request.
+Keep each finding's severity as its reviewer set it, or as the verifier lowered it with a reason. Add your own view after the list, never in place of it. Ask before posting anything to a pull request.

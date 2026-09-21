@@ -36,4 +36,4 @@ Write the result to `docs/plans/<yyyy-mm-dd>-<topic>-design.md`, unless the proj
 - what is out of scope
 - questions still open, if any
 
-Commit it once the person agrees. For multi-step work, the next step is `/loadout:plan-write`.
+Commit it only if the person has asked for commits in this session. For multi-step work, the next step is `/loadout:plan-write`.

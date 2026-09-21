@@ -17,10 +17,10 @@ For each task, dispatch a fresh subagent with the Agent tool. Its prompt carries
 
 - the task's full text, pasted
 - where it fits: what earlier tasks built and which files they touched
-- the rule: write the task's test first, see it fail, make it pass, then commit
+- the rule: write the task's test first, see it fail, make it pass, then commit with no AI attribution
 - what to return: files changed, the test command with its output, the commit, and anything it could not do
 
-Tasks the plan marks independent, touching different files, can go out in parallel in one message. Tasks that share files go one at a time.
+Implementation tasks run one at a time: subagents that commit in one working tree collide on the git index and pick up each other's files. Independent tasks may run in parallel only when each gets its own git worktree under `.worktrees/`, merged back one at a time. Read-only work, such as investigation or review, can always run in parallel.
 
 ## 3. Check each result yourself
 
@@ -36,4 +36,4 @@ When a test fails, a check disagrees with the report, or a subagent could not fi
 
 ## 5. Finish
 
-After the last task, run the full test suite and report task by task: done, its test, its commit. Then offer `/loadout:code-review` before a pull request, and `/loadout:git-pr` to open one.
+After the last task, run the full test suite and report task by task: done, its test, its commit. Then tell the person they can type `/loadout:code-review` for a team review before a pull request, and offer to open one following `loadout:git-pr`.

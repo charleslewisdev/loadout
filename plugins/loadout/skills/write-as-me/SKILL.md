@@ -1,6 +1,6 @@
 ---
 name: write-as-me
-description: Drafts text that will be published under your name: PRs, issues, review replies, READMEs, chat. Shows the draft for approval and never posts it.
+description: "Drafts text that will be published under your name: PRs, issues, review replies, READMEs, chat. Shows the draft for approval and never posts it."
 disable-model-invocation: true
 argument-hint: <what to write, and for whom>
 ---
