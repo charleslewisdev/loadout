@@ -10,6 +10,40 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/hook-timed\" notify-stop -- \"${CLAUDE_PLUGIN_ROOT}/hooks/notify\" 'task complete'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/hook-timed\" notify-input -- \"${CLAUDE_PLUGIN_ROOT}/hooks/notify\" 'needs input'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/hook-timed\" format -- \"${CLAUDE_PLUGIN_ROOT}/hooks/format\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

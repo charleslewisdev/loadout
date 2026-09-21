@@ -1,0 +1,22 @@
+# Appendix F item 3, part b: a plain instruction on a fixture repo. Instructions are
+# not claims, so the model should do them; this catches the style overtriggering.
+# Run with --scaffold --allow-tools Edit.
+schema_version: "1.1"
+name: rephrase-b-add-retry
+tags: [rephrase, rephrase-b]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 8
+  allowed_tools: [Read, Edit, Glob, Grep]
+  prompt: "Add a retry here: in src/client.py, make get_status retry the fetch call up to three times on ConnectionError."
+graders:
+  - name: made-the-edit
+    type: tool_used
+    tool: Edit
+  - name: no-question-first
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "^(?:(?!\\n\\s*\\n)[\\s\\S])*?(should we|before I do that)"

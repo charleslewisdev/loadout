@@ -15,5 +15,10 @@
   "cleanupPeriodDays": 120,
   "env": {
     "CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE": "1"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "$HOME/.claude/plugins/marketplaces/loadout/plugins/loadout/statusline/statusline.sh",
+    "padding": 0
   }
 }

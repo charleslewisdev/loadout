@@ -7,7 +7,7 @@
 # profiles/<profile>.json over it with `jq -s '.[0] * .[1]'`: profile keys win and
 # every other key is kept. "$HOME" in a profile string becomes this machine's home.
 # A second run leaves settings.json byte-identical. Unless --no-register, it adds
-# the loadout marketplace (again, when its ref changed) and installs the plugin.
+# the loadout marketplace (again, when its ref changed) and installs or updates the plugin.
 # --ref tracks another branch than the profile's, to run an unmerged branch.
 #
 # The marketplace source names the author's GitHub account, so run this only on
@@ -55,6 +55,8 @@ if ! claude plugin marketplace list --json |
   jq -e --arg ref "$want_ref" 'any(.[]; .name == "loadout" and ((.ref // "") == $ref))' >/dev/null; then
   claude plugin marketplace add "$url${want_ref:+#$want_ref}"
 fi
-if ! claude plugin list --json | jq -e 'any(.[]; .id == "loadout@loadout")' >/dev/null; then
+if claude plugin list --json | jq -e 'any(.[]; .id == "loadout@loadout")' >/dev/null; then
+  claude plugin update loadout@loadout
+else
   claude plugin install loadout@loadout
 fi

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Desktop notification for the Stop and Notification hooks.
+#
+#   notify <event text>
+#
+# Returns OSC 777 plus a BEL fallback in the hook output's terminalSequence field.
+# Claude Code writes it to the terminal itself (plain hook stdout never reaches it)
+# and wraps it for tmux or screen when it runs inside one (binary, 2.1.278).
+# Notification payloads carry their own message, which replaces the event text.
+input=$(cat)
+cwd=$(jq -r '.cwd // empty' <<<"$input" 2>/dev/null)
+message=$(jq -r '.message // empty' <<<"$input" 2>/dev/null)
+project=$(basename "${cwd:-$PWD}")
+text=${message:-${1:-done}}
+# OSC parameters are separated by ";", and control characters would end the sequence.
+clean() { printf '%s' "$1" | tr -d '\000-\037\177' | tr ';' ','; }
+jq -nc --arg seq "$(printf '\033]777;notify;%s;%s\033\\\a' "Claude Code" "[$(clean "$project")] $(clean "$text")")" \
+  '{terminalSequence: $seq}'
