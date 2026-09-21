@@ -10,7 +10,8 @@
 #      guard/allowed-emails, no secret patterns, and the private denylist where
 #      it exists (never in CI)
 #   4. plugin, marketplace and skill names against guard/forbidden-names
-#   5. locally only: claude plugin validate .
+#   5. the statusline tests
+#   6. locally only: claude plugin validate .
 set -uo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -62,6 +63,7 @@ step 'budget lint' scripts/lint-budgets
 step 'every plugin has evals' evals_present
 step 'identity and secret scan, full history' guard/scan --all
 step 'forbidden names' names_allowed
+step 'statusline tests' bash -c 'plugins/loadout/statusline/statusline.test.sh >/dev/null || plugins/loadout/statusline/statusline.test.sh | grep "✗"'
 ((ci)) || step 'claude plugin validate' claude plugin validate .
 
 if ((${#failed[@]})); then

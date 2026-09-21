@@ -158,6 +158,7 @@ cache="$HOME/.cache/loadout"
 mkdir -p "$cache"
 {
   echo "date=$(date -u +%FT%TZ)"
+  echo "epoch=$(date +%s)"
   echo "claude_version=$version"
   echo "runs=$runs"
   echo "configured=$configured_lo-$configured_hi"
