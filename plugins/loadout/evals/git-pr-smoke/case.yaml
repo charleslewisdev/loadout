@@ -15,6 +15,7 @@ graders:
   - name: used-the-skill
     type: tool_used
     tool: Skill
+    input_match: "loadout:git-pr"
     arm: with-only
   - name: read-the-diff
     type: tool_used

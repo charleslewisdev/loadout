@@ -1,9 +1,6 @@
 # code-debug smoke case: a reported bug in a small package whose tests miss it.
 # The skill's point is the order: a failing test that reproduces the bug comes
 # before any change to the source. Run with --scaffold --allow-tools Bash Edit Write.
-# On this machine the eval sandbox cannot run Bash (bubblewrap is blocked by
-# kernel.apparmor_restrict_unprivileged_userns), so graders judge attempts, order
-# and final files, never a command's output.
 schema_version: "1.1"
 name: code-debug-smoke
 tags: [smoke, code-debug]
@@ -21,22 +18,10 @@ graders:
     tool: Skill
     input_match: "loadout:code-debug"
     arm: with-only
-  - name: test-edited-before-fix
-    type: tool_order
-    before:
-      tool: Edit
-      input_match: "\"file_path\":\\s*\"[^\"]*tests/"
-    after:
-      tool: Edit
-      input_match: "\"file_path\":\\s*\"[^\"]*durations/parse\\.py\""
-  - name: test-run-before-fix
-    type: tool_order
-    before:
-      tool: Bash
-      input_match: "unittest|pytest"
-    after:
-      tool: Edit
-      input_match: "\"file_path\":\\s*\"[^\"]*durations/parse\\.py\""
+  - name: test-first-then-fix
+    type: regex
+    target: trace
+    pattern: '"name":"(?:Edit|Write)","input":\{[^{}]*?"file_path":"[^"]*tests/[^"]*"[\s\S]*"name":"Bash","input":\{"command":"[^"]*(?:unittest|pytest)[\s\S]*"name":"(?:Edit|Write)","input":\{[^{}]*?"file_path":"[^"]*durations/parse\.py"'
   - name: fixed
     type: llm
     focus:

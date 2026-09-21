@@ -1,6 +1,6 @@
-# Smoke case for plan-run: a written plan is carried out with one fresh subagent
-# per task. Run with --scaffold --allow-tools Write Edit. The plan's checks read
-# files, because Bash fails at sandbox setup inside eval runs on some machines.
+# Smoke case for plan-run: a written plan in a git repository is carried out one
+# task at a time, each in a fresh subagent that writes the task's test, makes it
+# pass and commits. Run with --scaffold --allow-tools Write Edit Bash Agent.
 schema_version: "1.1"
 name: plan-run-smoke
 tags: [smoke, plan-run]
@@ -10,7 +10,7 @@ context:
 execution:
   max_turns: 30
   timeout_seconds: 600
-  allowed_tools: [Skill, Read, Glob, Grep, Write, Edit, Agent]
+  allowed_tools: [Skill, Read, Glob, Grep, Write, Edit, Bash, Agent]
   prompt: "Execute the plan in docs/plans/two-helpers.md."
 graders:
   - name: skill-fired
@@ -28,3 +28,11 @@ graders:
   - name: clamp-written
     type: file_exists
     path: src/math_utils.py
+  - name: tests-written
+    type: file_exists
+    path: tests/test_math_utils.py
+  - name: one-commit-per-task
+    type: tool_used
+    tool: Bash
+    input_match: "git commit"
+    min: 2
