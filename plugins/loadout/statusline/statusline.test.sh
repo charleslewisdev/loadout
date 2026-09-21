@@ -186,6 +186,17 @@ colored=$(fixture session | CLAUDE_STATUSLINE_WIDTH=80 bash "$SL" | sed $'s/\033
 plain=$(fixture session | NO_COLOR=1 CLAUDE_STATUSLINE_WIDTH=80 bash "$SL")
 [ "$colored" = "$plain" ]; check "colour and links do not change which segments fit" $?
 
+# A render must never refresh .git/index: that takes index.lock and can collide
+# with a commit the agent is making.
+T=$(mktemp -d)
+git -C "$T" init -q && printf 'a\n' >"$T/f" && git -C "$T" add f &&
+  git -C "$T" -c user.name=t -c user.email=test@localhost commit -q -m t && sleep 1 && touch "$T/f"
+before=$(stat -c %Y "$T/.git/index" 2>/dev/null || stat -f %m "$T/.git/index")
+printf '{"model":{"display_name":"Opus 5"},"workspace":{"current_dir":"%s"}}' "$T" | NO_COLOR=1 bash "$SL" >/dev/null
+after=$(stat -c %Y "$T/.git/index" 2>/dev/null || stat -f %m "$T/.git/index")
+[ "$before" = "$after" ]; check "a render leaves .git/index untouched" $?
+rm -rf "$T"
+
 out=$(render nogit)
 grep -q '⎇' <<<"$out"; check "omits the branch outside a repo" $((1 - $?))
 grep -q '11%' <<<"$out"; check "still renders meters without git" $?

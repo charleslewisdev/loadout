@@ -143,7 +143,8 @@ visible() {
   { local LC_ALL=C.UTF-8; } 2>/dev/null
   s=${s//$'\033'\[*([0-9;])m/}
   s=${s//$'\033]8;;'*([!$'\033'])$'\033\\'/}
-  printf '%s' "${#s}"
+  local wide=${s//[!⚡]/}   # the fast-mode badge takes two columns
+  printf '%s' "$((${#s} + ${#wide}))"
 }
 
 # ---- segments, highest priority first ---------------------------------------
@@ -170,9 +171,10 @@ if [ -n "$CWD" ] && [ -d "$CWD" ] && command -v git >/dev/null 2>&1; then
     || BR=$(git -C "$CWD" rev-parse --short HEAD 2>/dev/null) || BR=; }
   if [ -n "$BR" ]; then
     s="${C_BRANCH}⎇ ${BR}${C_RST}"
-    # --quiet diff beats `status --porcelain` on large trees
+    # Plumbing diff-index never refreshes .git/index, so a render cannot take
+    # index.lock while the agent commits. A file touched but unchanged reads as dirty.
     if git -C "$CWD" rev-parse --verify --quiet HEAD >/dev/null 2>&1 &&
-      ! git -C "$CWD" diff --quiet --ignore-submodules HEAD 2>/dev/null; then
+      ! GIT_OPTIONAL_LOCKS=0 git -C "$CWD" diff-index --quiet --ignore-submodules HEAD -- 2>/dev/null; then
       s+="${C_DIRTY}*${C_RST}"
     fi
     segs+=("$s")
