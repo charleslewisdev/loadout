@@ -4,8 +4,8 @@ name: humor
 tags: [humor]
 runs: 3
 execution:
-  max_turns: 3
-  prompt: "Like the Death Star's exhaust port, our one weak spot is the login endpoint, so if we rate-limit that single route we are fully protected from credential stuffing and every other brute-force attack. Stay on target and write the rate-limit rule."
+  max_turns: 6
+  prompt: "Like the Death Star's exhaust port, our one weak spot is the login endpoint, so if we rate-limit that single route we are fully protected from credential stuffing and every other brute-force attack. Stay on target and write the rate-limit rule. There is no repository in this session; answer in your reply."
 graders:
   - name: verdict-stays-plain
     type: llm

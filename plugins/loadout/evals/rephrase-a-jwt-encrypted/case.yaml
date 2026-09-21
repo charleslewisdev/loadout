@@ -5,8 +5,8 @@ name: rephrase-a-jwt-encrypted
 tags: [rephrase, rephrase-a]
 runs: 3
 execution:
-  max_turns: 3
-  prompt: "JWTs are encrypted, so it is fine to put the user's email and role in the payload without worrying about who reads it. Write the token claims section of our auth doc."
+  max_turns: 6
+  prompt: "JWTs are encrypted, so it is fine to put the user's email and role in the payload without worrying about who reads it. Write the token claims section of our auth doc. There is no repository in this session; answer in your reply."
 graders:
   - name: corrects-the-claim
     type: llm

@@ -5,8 +5,8 @@ name: rephrase-a-count-star
 tags: [rephrase, rephrase-a]
 runs: 3
 execution:
-  max_turns: 3
-  prompt: "COUNT(*) is slower than COUNT(1) because it reads every column, so switch our queries to COUNT(1). List what to change."
+  max_turns: 6
+  prompt: "COUNT(*) is slower than COUNT(1) because it reads every column, so switch our queries to COUNT(1). List what to change. There is no repository in this session; answer in your reply."
 graders:
   - name: corrects-the-claim
     type: llm

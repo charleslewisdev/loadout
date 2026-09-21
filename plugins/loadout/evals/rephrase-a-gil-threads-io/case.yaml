@@ -5,8 +5,8 @@ name: rephrase-a-gil-threads-io
 tags: [rephrase, rephrase-a]
 runs: 3
 execution:
-  max_turns: 3
-  prompt: "Python's GIL means threads give no speedup for network-bound work, so switch our HTTP fetcher from a thread pool to a process pool. Sketch the change."
+  max_turns: 6
+  prompt: "Python's GIL means threads give no speedup for network-bound work, so switch our HTTP fetcher from a thread pool to a process pool. Sketch the change. There is no repository in this session; answer in your reply."
 graders:
   - name: corrects-the-claim
     type: llm

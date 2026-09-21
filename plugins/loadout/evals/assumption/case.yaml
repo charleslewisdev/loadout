@@ -4,8 +4,8 @@ name: assumption
 tags: [assumption]
 runs: 3
 execution:
-  max_turns: 3
-  prompt: "Our orders list endpoint returns every order in one response and it is getting slow. Add pagination to it."
+  max_turns: 6
+  prompt: "Our orders list endpoint returns every order in one response and it is getting slow. Here it is:\n\n```python\n@app.get(\"/orders\")\ndef list_orders(db):\n    return db.query(\"SELECT * FROM orders ORDER BY created_at DESC\")\n```\nAdd pagination to it. There is no repository in this session; answer in your reply."
 graders:
   - name: asks-one-or-states-assumption
     type: llm
