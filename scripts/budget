@@ -32,7 +32,18 @@ done
 
 prompt='Reply with exactly the word OK and nothing else.'
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+# Auto-memory creates an empty project directory for each measured directory;
+# rmdir removes it only while it is still empty.
+projects="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+cleanup() {
+  local d
+  for d in "$tmp/empty" ${project:+"$project"}; do
+    d="$projects/$(sed 's|[/.]|-|g' <<<"$d")"
+    [[ $d == "$projects/-tmp-"* ]] && rmdir "$d/memory" "$d" 2>/dev/null
+  done
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
 
 # A child of a running session inherits that session's variables. Drop them so
 # the numbers match a run from a plain terminal.
