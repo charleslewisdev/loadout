@@ -56,7 +56,8 @@ measure() {
   echo "budget: $label, $runs runs" >&2
   for ((i = 1; i <= runs; i++)); do
     (cd "$dir" && env "${clean[@]}" ${assign:+"$assign"} claude -p "$prompt" --model haiku \
-      --output-format json --debug-file "$tmp/$label.$i.log" "$@" >"$tmp/$label.$i.json" 2>"$tmp/$label.$i.err") &
+      --output-format json --no-session-persistence --debug-file "$tmp/$label.$i.log" "$@" \
+      >"$tmp/$label.$i.json" 2>"$tmp/$label.$i.err") &
   done
   wait
   for ((i = 1; i <= runs; i++)); do
