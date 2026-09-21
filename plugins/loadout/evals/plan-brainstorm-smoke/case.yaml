@@ -1,0 +1,19 @@
+# Smoke case for plan-brainstorm: an open idea gets one question back, not a
+# finished design and not a list of questions.
+schema_version: "1.1"
+name: plan-brainstorm-smoke
+tags: [smoke, plan-brainstorm]
+runs: 3
+execution:
+  max_turns: 6
+  allowed_tools: [Skill, Read, Glob, Grep]
+  prompt: "I want to let users of our note-taking web app export their notes. Nothing is decided yet: not the format, not the scope, not where the export runs. Help me work out the design. There is no repository in this session; answer in your reply."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: plan-brainstorm
+    arm: with-only
+  - name: one-question
+    type: llm
+    criteria: "Pass only if the reply asks the user exactly one question and stops there, without presenting a finished design. A short restatement of the goal or a note on what comes next is fine; offering labeled options for that one question is fine. Fail if the reply asks two or more questions, or lays out a full design or plan before asking anything."
