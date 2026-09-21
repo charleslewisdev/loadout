@@ -1,0 +1,8 @@
+{
+  "name": "loadout",
+  "version": "0.2.1",
+  "description": "Always-on harness: the peer output style and a silent configuration check.",
+  "author": {
+    "name": "charleslewisdev"
+  }
+}

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Staged diff against the denylist and secret patterns; author and committer email
+# against guard/allowed-emails.
+exec "$(git rev-parse --show-toplevel)/guard/scan" diff

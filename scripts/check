@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Repository checks. CI runs `scripts/check --ci`, which needs no Claude and no
+# network; locally it also validates the marketplace with the CLI.
+#
+#   scripts/check [--ci]
+#
+#   1. scripts/lint-budgets
+#   2. every plugins/*/ has at least one evals/**/case.yaml
+#   3. guard/scan --all: every author and committer email is in
+#      guard/allowed-emails, no secret patterns, and the private denylist where
+#      it exists (never in CI)
+#   4. plugin, marketplace and skill names against guard/forbidden-names
+#   5. locally only: claude plugin validate .
+set -uo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root" || exit 2
+ci=0
+[[ ${1:-} == --ci ]] && ci=1
+failed=()
+
+step() {  # label, command...
+  local label=$1
+  shift
+  echo "== $label"
+  "$@" || failed+=("$label")
+}
+
+evals_present() {
+  local d ok=0
+  for d in plugins/*/; do
+    if [[ -z $(find "$d" -path '*/evals/*' -name case.yaml -print -quit) ]]; then
+      echo "${d%/} has no evals/**/case.yaml"
+      ok=1
+    fi
+  done
+  return $ok
+}
+
+names_allowed() {
+  local ok=0 name rc
+  while IFS= read -r name; do
+    rc=0
+    grep -q -i -E -f <(grep -v -e '^#' -e '^[[:space:]]*$' guard/forbidden-names) <<<"$name" || rc=$?
+    if ((rc == 0)); then
+      echo "forbidden word in name: $name"
+      ok=1
+    elif ((rc > 1)); then
+      echo "guard/forbidden-names holds an invalid pattern"
+      return 1
+    fi
+  done < <(
+    find plugins -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
+    find plugins -mindepth 3 -maxdepth 3 -path '*/skills/*' -type d -printf '%f\n'
+    jq -r '.name, .plugins[].name' .claude-plugin/marketplace.json
+    jq -r '.name' plugins/*/.claude-plugin/plugin.json
+  )
+  return $ok
+}
+
+step 'budget lint' scripts/lint-budgets
+step 'every plugin has evals' evals_present
+step 'identity and secret scan, full history' guard/scan --all
+step 'forbidden names' names_allowed
+((ci)) || step 'claude plugin validate' claude plugin validate .
+
+if ((${#failed[@]})); then
+  printf 'check: FAILED: %s\n' "${failed[@]}"
+  exit 1
+fi
+echo "check: all passed"

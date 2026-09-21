@@ -1,0 +1,12 @@
+{
+  "name": "loadout",
+  "owner": { "name": "charleslewisdev" },
+  "description": "A personal Claude Code harness with measured budgets.",
+  "plugins": [
+    {
+      "name": "loadout",
+      "source": "./plugins/loadout",
+      "description": "Always-on harness: the peer output style and a silent configuration check."
+    }
+  ]
+}

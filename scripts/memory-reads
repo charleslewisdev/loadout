@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# How often sessions read their auto-memory (success criterion S4).
+#
+#   scripts/memory-reads [days]     default 14
+#
+# Counts Read and Grep calls into any auto-memory directory
+# (~/.claude/projects/<project>/memory/) per session, from the transcripts
+# ~/.claude/projects/*/*.jsonl modified in the last <days> days. Only interactive
+# sessions count: print-mode runs (entrypoint sdk-*), such as evals and
+# scripts/budget, are reported as excluded.
+#
+# Skips every project directory and transcript that matches the identity guard's
+# denylist, and refuses to run without it. Before matching, the home path is
+# replaced by ~, and attachment records are dropped: they hold the injected user
+# CLAUDE.md, which names the private vocabulary in every session.
+set -euo pipefail
+
+days=${1:-14}
+deny="${GUARD_DENYLIST:-$HOME/.config/loadout-guard/denylist}"
+projects="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+if [[ ! -r $deny ]]; then
+  echo "memory-reads: no denylist at ${deny/#"$HOME"/\~}; refusing to read transcripts" >&2
+  exit 2
+fi
+enc=${HOME//\//-}
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+grep -v -e '^[[:space:]]*$' "$deny" >"$tmp/deny" || true
+rc=0
+grep -E -f "$tmp/deny" /dev/null || rc=$?
+if [[ ! -s $tmp/deny ]] || ((rc > 1)); then
+  echo "memory-reads: the denylist is empty or holds an invalid pattern; refusing to read transcripts" >&2
+  exit 2
+fi
+
+scanned=0 skipped=0 printmode=0 with_reads=0 reads=0
+: >"$tmp/per-session"
+for dir in "$projects"/*/; do
+  name=$(basename "$dir")
+  if grep -q -i -E -f "$tmp/deny" <<<"${name//"$enc"/\~}"; then
+    skipped=$((skipped + $(find "$dir" -maxdepth 1 -name '*.jsonl' -mtime "-$days" | wc -l)))
+    continue
+  fi
+  while IFS= read -r t; do
+    entry=$(jq -n -r 'first(inputs | .entrypoint // empty) // ""' "$t" 2>/dev/null || true)
+    if [[ $entry == sdk* ]]; then
+      printmode=$((printmode + 1))
+      continue
+    fi
+    # A corrupt or half-written line ends the conversation early; only what was
+    # parsed is matched and counted.
+    { jq -c 'select(.type != "attachment")' "$t" 2>/dev/null || true; } |
+      sed -e "s|$HOME|~|g" -e "s|$enc|~|g" >"$tmp/conversation"
+    if grep -q -i -E -f "$tmp/deny" "$tmp/conversation"; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    scanned=$((scanned + 1))
+    n=$(jq -r 'select(.type == "assistant") | .message.content[]?
+          | select(.type == "tool_use" and (.name == "Read" or .name == "Grep"))
+          | .input.file_path // .input.path // empty' "$tmp/conversation" 2>/dev/null |
+      grep -c -E '\.claude/projects/[^/]+/memory(/|$)' || true)
+    echo "$n" >>"$tmp/per-session"
+    if ((n > 0)); then
+      with_reads=$((with_reads + 1))
+      reads=$((reads + n))
+    fi
+  done < <(find "$dir" -maxdepth 1 -name '*.jsonl' -mtime "-$days")
+done
+
+echo "Auto-memory reads, last $days days, $(date +%F)"
+echo "  sessions scanned            $scanned"
+echo "  sessions skipped (denylist) $skipped"
+echo "  print-mode runs excluded    $printmode"
+echo "  sessions with a memory read $with_reads"
+echo "  Read and Grep calls         $reads"
+if ((scanned > 0)); then
+  awk -v r="$reads" -v s="$scanned" 'BEGIN { printf "  reads per session           %.3f\n", r / s }'
+  echo "  distribution (reads: sessions)  $(sort -n "$tmp/per-session" | uniq -c | awk '{ printf "%s: %s  ", $2, $1 }')"
+fi

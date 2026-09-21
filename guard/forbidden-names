@@ -1,0 +1,7 @@
+# Words no plugin, marketplace or skill name may contain. Published on purpose:
+# CI checks names against this list and never sees the private denylist.
+# One extended regex per line, matched case-insensitively.
+claude-harness
+private
+personal
+secret

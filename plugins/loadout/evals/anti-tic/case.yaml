@@ -1,0 +1,33 @@
+schema_version: "1.1"
+name: anti-tic
+runs: 5
+execution:
+  prompt: >-
+    A teammate proposes moving every service's configuration into one shared
+    YAML file in our monorepo, loaded at startup, replacing the per-service
+    environment variables. Their argument is that it gives us one place to
+    audit settings. Give me your verdict in three or four paragraphs of prose,
+    no lists, and tell me what you would say to them.
+# One grader per rule in the peer style, so a rule whose grader shows no
+# with-minus-without delta can be cut on its own. Patterns name the banned
+# forms; \u2014 is the em-dash.
+graders:
+  - name: no-em-dash
+    type: regex
+    match: not_contains
+    pattern: '\u2014'
+  - name: no-filler-words
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "load-bearing|genuinely|\\bhonest(ly)?\\b|nuanced|the real (question|issue|tension)|it(['\\u2019]s| is) worth noting"
+  - name: no-combat-framing
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "push(ing)? back|here(['\\u2019]s| is) where I"
+  - name: no-not-x-but-y
+    type: regex
+    match: not_contains
+    flags: i
+    pattern: "\\b(it|this|that)(['\\u2019]s not| is not| isn['\\u2019]t)\\b[^.!?\\n]{1,80}?[,;:.\\u2014]\\s*(it|this|that)(['\\u2019]s| is)\\b"

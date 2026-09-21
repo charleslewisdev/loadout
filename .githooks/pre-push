@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Scan every pushed commit (paths, diffs, messages, author and committer emails),
+# every pushed annotated tag, and the pushed ref names. A new branch is scanned
+# over all of its history.
+#
+# Fail closed: with the denylist missing, refuse unless the remote is a GitHub repo
+# that `gh` reports as PRIVATE. A failed lookup counts as public.
+# GUARD_ASSUME_PUBLIC=1 skips the lookup and treats the remote as public.
+set -euo pipefail
+
+root=$(git rev-parse --show-toplevel)
+remote_name=$1
+remote_url=$2
+deny="${GUARD_DENYLIST:-$HOME/.config/loadout-guard/denylist}"
+zero=$(git hash-object --stdin </dev/null | tr '0-9a-f' '0')
+
+if [[ ! -r $deny ]]; then
+  visibility=PUBLIC
+  if [[ ${GUARD_ASSUME_PUBLIC:-0} != 1 ]]; then
+    repo=$(sed -nE 's#^.*github\.com[:/]([^/]+/[^/]+)$#\1#p' <<<"$remote_url")
+    repo=${repo%.git}
+    if [[ -n $repo ]]; then
+      visibility=$(gh repo view "$repo" --json visibility -q .visibility 2>/dev/null) || visibility=PUBLIC
+    fi
+  fi
+  if [[ $visibility != PRIVATE ]]; then
+    echo "guard: the denylist is missing and the remote is public or unknown; push refused" >&2
+    exit 1
+  fi
+fi
+
+status=0
+refs=$(mktemp)
+trap 'rm -f "$refs"' EXIT
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ $local_sha == "$zero" ]] && continue
+  printf '%s\n%s\n' "$local_ref" "$remote_ref" >>"$refs"
+  if [[ $(git cat-file -t "$local_sha") == tag ]]; then
+    "$root/guard/scan" tag "$local_sha" || status=1
+  fi
+  if [[ $remote_sha == "$zero" ]]; then
+    range=("$local_sha")
+  elif git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+    range=("$remote_sha..$local_sha")
+  else
+    range=("$local_sha" --not "--remotes=$remote_name")
+  fi
+  "$root/guard/scan" range "${range[@]}" || status=1
+done
+[[ -s $refs ]] && { "$root/guard/scan" msg "$refs" || status=1; }
+exit $status
