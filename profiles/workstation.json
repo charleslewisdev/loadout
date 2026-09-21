@@ -20,5 +20,10 @@
     "type": "command",
     "command": "$HOME/.claude/plugins/marketplaces/loadout/plugins/loadout/statusline/statusline.sh",
     "padding": 0
+  },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
   }
 }

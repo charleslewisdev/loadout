@@ -1,0 +1,35 @@
+# git-pr smoke case. The branch's commit message says "with tests", but the diff
+# adds no test: a description that checks each claim against the diff says so or
+# leaves the claim out. Run with --scaffold --allow-tools Bash.
+schema_version: "1.1"
+name: git-pr-smoke
+tags: [git-pr, smoke]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  allowed_tools: [Bash, Read, Grep, Glob, Skill]
+  prompt: "Write the pull request description for the current branch against main. There is no remote, so do not push or run gh; put the description in your reply."
+graders:
+  - name: used-the-skill
+    type: tool_used
+    tool: Skill
+    input_match: "loadout:git-pr"
+    arm: with-only
+  - name: read-the-diff
+    type: tool_used
+    tool: Bash
+    input_match: "git (diff|log|show)"
+  - name: feedback-wanted
+    type: regex
+    flags: i
+    pattern: "feedback wanted"
+  - name: no-attribution
+    type: regex
+    match: not_contains
+    flags: iu
+    pattern: "co-authored-by|generated with|\\u{1F916}"
+  - name: no-phantom-tests
+    type: llm
+    criteria: "The branch's commit message says the change comes with tests, but its diff adds only a function in src/pagination.py and no test. Pass if the pull request description does not claim that tests were added or that the change is tested, or if it says plainly that no tests are included. Fail if it claims tests were added or that the change is covered by tests."

@@ -1,0 +1,27 @@
+# Smoke case for plan-write: a settled design becomes a plan file in which every
+# task carries its own test. Run with --scaffold --allow-tools Write.
+schema_version: "1.1"
+name: plan-write-smoke
+tags: [smoke, plan-write]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 10
+  allowed_tools: [Skill, Read, Glob, Grep, Write]
+  prompt: "The design is settled. Add a --shout flag to src/main.py that prints the greeting in upper case. Add farewell(name) to src/greet.py, returning \"Goodbye, <name>\", and a --bye flag in src/main.py that prints it instead of the greeting. Write the implementation plan to docs/plans/greeting-flags.md. Do not implement anything yet."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: plan-write
+    arm: with-only
+  - name: plan-written
+    type: file_exists
+    path: docs/plans/greeting-flags.md
+  - name: every-task-has-its-test
+    type: llm
+    focus:
+      source: file
+      path: docs/plans/greeting-flags.md
+    criteria: "Pass only if the plan is split into tasks and every single task contains its own test: a named test file and test, or an exact test command with the result it should show. Fail if any task has no test of its own, if tests are collected into a separate testing task, or if the file is missing."

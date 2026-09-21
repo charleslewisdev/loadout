@@ -1,0 +1,24 @@
+# write-as-me smoke case. The skill is typed only, so there is no Skill tool call
+# to check; the graders check the voice and that nothing is posted. "First person
+# singular" rules out "we" for the author's own choice; it does not require "I".
+schema_version: "1.1"
+name: write-as-me-smoke
+tags: [write-as-me, smoke]
+runs: 3
+execution:
+  max_turns: 4
+  allowed_tools: [Read]
+  prompt: "/loadout:write-as-me a reply to a code reviewer who asked why the cache TTL is 300 seconds. I chose it because the upstream API allows one request per key every five minutes."
+graders:
+  - name: no-em-dash
+    type: regex
+    match: not_contains
+    pattern: '\u2014'
+  - name: emoji-only-as-list-markers
+    type: regex
+    match: not_contains
+    flags: mu
+    pattern: "(?<!^(?:[-*] )?)[\\u{1F300}-\\u{1FAFF}\\u{2600}-\\u{27BF}]"
+  - name: shows-a-draft
+    type: llm
+    criteria: "Pass if the reply contains a draft of the reviewer reply that gives the five-minute rate limit as the reason for the 300-second TTL and presents it for approval rather than saying it was posted. The draft speaks as the author: it may say I or stay impersonal. Fail if there is no draft, if it says we for a choice the author made alone, if it refers to the author in the third person, or if the reply says the message was sent or posted."

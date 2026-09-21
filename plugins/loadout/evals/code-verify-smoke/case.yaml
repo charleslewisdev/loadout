@@ -1,0 +1,21 @@
+# code-verify smoke case, typed: /loadout:code-verify on a small app with a check
+# script. The skill's point is evidence: the project's checks run and the reply
+# shows their output. Run with --scaffold --allow-tools Bash.
+schema_version: "1.1"
+name: code-verify-smoke
+tags: [smoke, code-verify]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Bash, Glob, Grep]
+  prompt: "/loadout:code-verify app/cli.py as it stands, before I say it is ready."
+graders:
+  - name: ran-the-project-checks
+    type: tool_used
+    tool: Bash
+    input_match: "check\\.sh"
+  - name: shows-the-evidence
+    type: llm
+    criteria: "Pass only if the reply reports what the project's checks printed (for example how many tests ran and whether they passed) and bases its verdict on that output. Fail if it declares the code ready, working or passing without quoting check output."
