@@ -58,8 +58,10 @@ cat >check.sh <<'SH'
 #!/usr/bin/env bash
 # Byte-compiles every module (the lint) and runs the tests.
 set -euo pipefail
-python3 -m compileall -q app tests
-python3 -m unittest -q
+# The system Python: a version-manager shim on PATH may be unreadable in a sandbox.
+PY=$(command -v /usr/bin/python3 || command -v python3)
+"$PY" -m compileall -q app tests
+"$PY" -m unittest -q
 SH
 chmod +x check.sh
 printf '# report\n\nCounts lines in a file.\n\n## Checks\n\n`./check.sh` runs the lint and the tests.\n' >README.md

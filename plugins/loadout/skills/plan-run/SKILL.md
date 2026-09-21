@@ -9,7 +9,7 @@ You coordinate and subagents do the work. A fresh subagent per task keeps each t
 
 ## 1. Read and check the plan
 
-Read the whole plan once. Before starting, name any task that cannot be done from its text alone, any task without a test, and any task that depends on a later one, and settle them with the person. Put the tasks in a todo list.
+Read the whole plan once. Before starting, name any task that cannot be done from its text alone, any task without a test, and any task that depends on a later one, and settle them with the person. If the plan does not say whether tasks end in a commit and the person has not asked for commits, ask once. Put the tasks in a todo list.
 
 ## 2. One subagent per task
 
@@ -17,7 +17,7 @@ For each task, dispatch a fresh subagent with the Agent tool. Its prompt carries
 
 - the task's full text, pasted
 - where it fits: what earlier tasks built and which files they touched
-- the rule: write the task's test first, see it fail, make it pass, then commit with no AI attribution
+- the rule: write the task's test first, see it fail, make it pass, then commit only if the plan or the person asked for commits, with no AI attribution
 - what to return: files changed, the test command with its output, the commit, and anything it could not do
 
 Implementation tasks run one at a time: subagents that commit in one working tree collide on the git index and pick up each other's files. Independent tasks may run in parallel only when each gets its own git worktree under `.worktrees/`, merged back one at a time. Read-only work, such as investigation or review, can always run in parallel.

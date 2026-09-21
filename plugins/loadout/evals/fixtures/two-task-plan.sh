@@ -11,7 +11,7 @@ touch src/__init__.py tests/__init__.py
 cat >docs/plans/two-helpers.md <<'MD'
 # Two helpers
 
-Goal: add two small helper modules. Run the tests with `python3 -m unittest`.
+Goal: add two small helper modules. Run the tests with `python3 -m unittest`. Each task ends in its own commit.
 
 ### Task 1: slugify
 
@@ -22,6 +22,8 @@ are not letters or digits with a single hyphen, and strips hyphens from both end
 
 Test: `tests/test_text_utils.py` asserts `slugify("Hello, World!") == "hello-world"`.
 
+Commit: `feat: add slugify`.
+
 ### Task 2: clamp
 
 Files: create `src/math_utils.py` and `tests/test_math_utils.py`.
@@ -30,5 +32,7 @@ Change: `clamp(value, low, high)` returns `low` when value is below it, `high` w
 above, and `value` otherwise.
 
 Test: `tests/test_math_utils.py` asserts `clamp(5, 0, 3) == 3` and `clamp(-1, 0, 3) == 0`.
+
+Commit: `feat: add clamp`.
 MD
 git add -A && git commit -q -m "docs: add the two-helpers plan"
