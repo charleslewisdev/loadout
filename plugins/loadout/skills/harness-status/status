@@ -15,21 +15,30 @@ now=$(date +%s)
 hints=()
 commas() { sed ':a;s/\B[0-9]\{3\}\>/,&/;ta' <<<"$1"; }
 field() { sed -n "s/^$1=//p" "$2" 2>/dev/null | head -1; }
+# A cached range is "low-high", and the low end can be negative ("-900-2300").
+lo() { local v; v=$(field "$1" "$2"); printf '%s' "${v%-*}"; }
+hi() { local v; v=$(field "$1" "$2"); printf '%s' "${v##*-}"; }
 age() { local e; e=$(field epoch "$1"); [[ $e =~ ^[0-9]+$ ]] && echo "$(((now - e) / 86400)) days ago" || echo "date unknown"; }
 
 if [[ ${1:-} == --measure ]]; then
   echo "Measuring: scripts/budget (about a minute), then scripts/memory-reads."
   "$repo/scripts/budget" >/dev/null 2>&1
-  "$repo/scripts/memory-reads" >/dev/null 2>&1
+  rc=$?
+  # scripts/budget exits 1 on a ceiling failure too; only a missing result is an error
+  if ((rc > 1)) || ! grep -q '^result=' "$cache/budget" 2>/dev/null; then
+    echo "MEASUREMENT FAILED: scripts/budget exited $rc; the numbers below are from the last good run."
+    hints+=("Rerun ${repo/#"$HOME"/\~}/scripts/budget in a terminal to see why it failed.")
+  fi
+  "$repo/scripts/memory-reads" >/dev/null 2>&1 ||
+    echo "MEASUREMENT FAILED: scripts/memory-reads exited $?; its line below is from the last good run."
 fi
 
 echo "## Turn-0 cost"
 b=$cache/budget
 if [[ -r $b ]]; then
-  share=$(field share "$b")
-  range=$(commas "${share%-*}"); [[ ${share%-*} != "${share#*-}" ]] && range+=" to $(commas "${share#*-}")"
+  range=$(commas "$(lo share "$b")"); [[ $(lo share "$b") != "$(hi share "$b")" ]] && range+=" to $(commas "$(hi share "$b")")"
   echo "Harness share $range tokens against a $(commas "$(field ceiling "$b")") ceiling: $(field result "$b"), measured $(age "$b") on Claude Code $(field claude_version "$b")."
-  echo "Vendor floor $(commas "$(field floor "$b" | cut -d- -f1)"); auto-memory section $(commas "$(field automemory "$b" | cut -d- -f2)"); MCP servers $(commas "$(field mcp "$b" | cut -d- -f2)")."
+  echo "Vendor floor $(commas "$(lo floor "$b")"); auto-memory section up to $(commas "$(hi automemory "$b")"); MCP servers up to $(commas "$(hi mcp "$b")")."
   if [[ -n $(field listing_chars "$b") ]]; then
     echo "Skill listing: $(field listing_skills "$b") skills, $(commas "$(field listing_chars "$b")") characters against a budget of $(commas "$(field listing_budget "$b")"), so descriptions are cut."
   fi
@@ -58,8 +67,15 @@ echo "Budgets at p95: session-start 300 ms, notify 100 ms, format 300 ms."
 
 echo
 echo "## Memory indexes"
-names=0 over100=0 over200=0
-: >"${TMPDIR:-/tmp}/loadout-status.$$"
+names=0 over100=0 over200=0 rows=''
+# Project names are withheld when they match the denylist, and all of them when
+# the denylist is missing, empty or invalid: this report lands in a session.
+deny_ok=0
+if [[ -s $deny ]]; then
+  rc=0
+  grep -E -f "$deny" /dev/null || rc=$?
+  ((rc <= 1)) && deny_ok=1
+fi
 for m in "$config"/projects/*/memory/MEMORY.md; do
   [[ -f $m ]] || continue
   names=$((names + 1))
@@ -68,13 +84,12 @@ for m in "$config"/projects/*/memory/MEMORY.md; do
   ((n > 200)) && over200=$((over200 + 1))
   p=$(basename "$(dirname "$(dirname "$m")")")
   p=${p//${HOME//\//-}/\~}
-  if [[ ! -r $deny ]] || grep -q -i -E -f "$deny" <<<"$p"; then p='(name withheld)'; fi
-  echo "$n $p" >>"${TMPDIR:-/tmp}/loadout-status.$$"
+  if ((!deny_ok)) || grep -q -i -E -f "$deny" <<<"$p"; then p='(name withheld)'; fi
+  rows+="$n"$'\t'"$p"$'\n'
 done
 echo "$names indexes; $over100 over 100 lines (a retro trigger), $over200 over 200 (the vendor loads only 200)."
 ((over100 > 0)) && hints+=("$over100 memory indexes are over 100 lines, which triggers a retro; the retro skill arrives in phase 3.")
-sort -rn "${TMPDIR:-/tmp}/loadout-status.$$" | head -5 | awk '{ printf "  %4d lines  %s\n", $1, $2 }'
-rm -f "${TMPDIR:-/tmp}/loadout-status.$$"
+printf '%s' "$rows" | sort -rn | head -5 | awk -F'\t' '{ printf "  %4d lines  %s\n", $1, $2 }'
 [[ -r $cache/memory-reads ]] && sed -n 's/^  reads per session *\(.*\)/Memory reads per interactive session: \1 (scripts\/memory-reads)./p' "$cache/memory-reads"
 
 echo
