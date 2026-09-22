@@ -1,0 +1,1 @@
+../fixtures/loadout-checkout.sh

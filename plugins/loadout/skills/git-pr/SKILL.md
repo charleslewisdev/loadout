@@ -9,7 +9,7 @@ A repository's own CLAUDE.md or CONTRIBUTING file wins over anything here.
 
 ## Branches
 
-- Feature branches merge to main through a pull request. Name them `type/description` in kebab-case: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`, `test/`.
+- Feature branches merge to main through a pull request. Name them `type/description` in kebab-case: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`, `test/`. The loadout harness's own skills also use `retro/` and `papercut/`.
 - Put worktrees under `.worktrees/` when the project uses them, and keep that directory ignored.
 
 ## Commits

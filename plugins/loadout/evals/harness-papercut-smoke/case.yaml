@@ -1,0 +1,30 @@
+# harness-papercut smoke case, typed: one annoyance in a checkout shaped like the
+# loadout repository, with no remote. The skill logs it in its own file under
+# retros/friction/ on a papercut branch and commits. The files target holds only uncommitted changes,
+# so the log line is checked in the trace, where the write carries a date. Run with --scaffold --allow-tools Bash Read Write Edit.
+schema_version: "1.1"
+name: harness-papercut-smoke
+tags: [smoke, harness-papercut]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  allowed_tools: [Bash, Read, Write, Edit, Glob, Grep]
+  prompt: "/loadout:harness-papercut the statusline shows the branch name twice. There is no remote here, so stop after the commit."
+graders:
+  - name: papercut-branch
+    type: tool_used
+    tool: Bash
+    input_match: "(checkout -b|switch -c|branch) papercut/"
+  - name: logged-a-friction-file
+    type: regex
+    target: trace
+    pattern: '"name":"Write","input":\{[^}]*"file_path":"[^"]*retros/friction/\d{4}-\d{2}-\d{2}-[^"]*\.md"|"name":"Bash","input":\{"command":"[^"]*>+ *[^"]*retros/friction/\d{4}-\d{2}-\d{2}-'
+  - name: committed
+    type: tool_used
+    tool: Bash
+    input_match: "git commit"
+  - name: smallest-fix
+    type: llm
+    criteria: "The planted statusline prints the branch segment twice. Pass if the reply either fixes plugins/loadout/statusline/statusline.sh so the branch appears once, touching nothing unrelated, or explains that it only logged the annoyance because no fix was clear. Fail if it changes unrelated files or proposes a broad rewrite."

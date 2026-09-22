@@ -26,3 +26,6 @@ graders:
   - name: found-the-bug
     type: llm
     criteria: "Pass only if the review reports that page_count undercounts when total is not a multiple of per_page (for example 10 items at 3 per page gives 3 instead of 4 pages)."
+  - name: found-the-rule-break
+    type: llm
+    criteria: "The project's CLAUDE.md says public functions validate their arguments and raise ValueError on bad input, and page_count on the branch does not validate its arguments. Pass only if the review reports that page_count skips this validation and ties it to the project's rule."

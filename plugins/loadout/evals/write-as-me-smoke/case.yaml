@@ -10,10 +10,9 @@ execution:
   allowed_tools: [Read]
   prompt: "/loadout:write-as-me a reply to a code reviewer who asked why the cache TTL is 300 seconds. I chose it because the upstream API allows one request per key every five minutes."
 graders:
-  - name: no-em-dash
-    type: regex
-    match: not_contains
-    pattern: '\u2014'
+  - name: leads-with-the-answer
+    type: llm
+    criteria: "Find the draft reply to the reviewer inside the response. Pass if its first sentence gives the reason for the 300-second TTL (the upstream limit of one request per key every five minutes). Fail if the draft opens with thanks, praise, a restatement of the question, or anything else before the reason."
   - name: emoji-only-as-list-markers
     type: regex
     match: not_contains

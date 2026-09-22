@@ -66,11 +66,41 @@ statusline_tests() {  # print only the failed assertions, keep the suite's statu
   return "$rc"
 }
 
+# retro-evidence on a synthetic home: it must exit 0, find the correction, withhold a
+# term hidden in snake_case, camelCase or behind an escape, and read papercut branches.
+retro_evidence_test() {
+  local t rc=0 out
+  t=$(mktemp -d)
+  mkdir -p "$t/cfg/projects/-w-app"
+  printf '\\bzorblax\\b\n' >"$t/deny"
+  local ts; ts=$(date -u +%FT%TZ)
+  for c in '"no, fix project_zorblax.md instead"' '"do not rename ZorblaxClient"' '"notes say\\nzorblax here"' '"do not touch the config, use env vars instead"'; do
+    printf '{"type":"user","uuid":"%s","sessionId":"%s","timestamp":"%s","entrypoint":"cli","message":{"role":"user","content":%s}}\n' \
+      "$RANDOM$RANDOM" "$RANDOM" "$ts" "$c" >"$t/cfg/projects/-w-app/$RANDOM.jsonl"
+  done
+  # A throwaway repository holding only this script, a main and one papercut branch.
+  mkdir -p "$t/repo/scripts" "$t/repo/retros/friction"
+  cp "$root/scripts/retro-evidence" "$t/repo/scripts/"
+  local g=(git -C "$t/repo" -c user.name=t -c user.email=test@localhost -c core.hooksPath=/dev/null)
+  "${g[@]}" init -q -b main && "${g[@]}" add scripts && "${g[@]}" commit -q -m "chore: start"
+  "${g[@]}" switch -q -c papercut/check-test
+  echo "2026-01-02 a check friction -> logged (none)" >"$t/repo/retros/friction/2026-01-02-check.md"
+  "${g[@]}" add retros && "${g[@]}" commit -q -m "test: papercut"
+  "${g[@]}" switch -q main
+  out=$(HOME=$t CLAUDE_CONFIG_DIR=$t/cfg GUARD_DENYLIST=$t/deny "$t/repo/scripts/retro-evidence" --since 2026-01-01) || rc=$?
+  rm -rf "$t"
+  ((rc == 0)) || { echo "retro-evidence exited $rc"; return 1; }
+  grep -q 'use env vars instead' <<<"$out" || { echo "the correction is missing"; return 1; }
+  grep -q 'open branch papercut/check-test' <<<"$out" || { echo "the papercut branch is missing"; return 1; }
+  if grep -q -i 'zorblax' <<<"$out"; then echo "a withheld term was printed"; return 1; fi
+}
+
 step 'budget lint' scripts/lint-budgets
 step 'every plugin has evals' evals_present
 step 'identity and secret scan, full history' guard/scan --all
 step 'forbidden names' names_allowed
 step 'statusline tests' statusline_tests
+step 'retro-evidence on a synthetic home' retro_evidence_test
 ((ci)) || step 'claude plugin validate' claude plugin validate .
 
 if ((${#failed[@]})); then

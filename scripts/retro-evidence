@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# Evidence for the retro, read so that nothing private reaches the model:
+#   friction   papercut lines on main and on papercut branches not yet merged
+#   usage      skill usage from ~/.claude.json, names withheld when they match
+#   prompts    the author's corrections, and prompts repeated across sessions
+#
+#   scripts/retro-evidence [--since <yyyy-mm-dd>]
+#
+# Default window: since the last retros/<date>.md, else 90 days, by each record's
+# own timestamp. Reads interactive sessions only (entrypoint sdk-* excluded) and
+# dedupes records by uuid, so a continued session is not counted twice. The retro
+# copies this text into a pull request, so it skips every project directory and
+# every whole transcript that matches the identity guard's denylist, in raw or
+# decoded text, filters every output line again, and refuses to run without a
+# valid denylist. Home paths become ~.
+set -euo pipefail
+
+usage() { echo "usage: scripts/retro-evidence [--since yyyy-mm-dd]" >&2; exit 2; }
+root=$(cd "$(dirname "$0")/.." && pwd)
+since=''
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --since) [[ $# -ge 2 ]] || usage; since=$2; shift 2 ;;
+    *) usage ;;
+  esac
+done
+if [[ -z $since ]]; then
+  last=$(ls "$root"/retros/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md 2>/dev/null | sort | tail -1) || true
+  since=${last:+$(basename "$last" .md)}
+fi
+[[ -n $since ]] || since=$(date -d '90 days ago' +%F 2>/dev/null || date -v-90d +%F)
+if [[ ! $since =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] ||
+  [[ $(date -d "$since" +%F 2>/dev/null || date -j -f %F "$since" +%F 2>/dev/null) != "$since" ]]; then
+  usage
+fi
+
+deny="${GUARD_DENYLIST:-$HOME/.config/loadout-guard/denylist}"
+config="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+grep -v -e '^[[:space:]]*$' "$deny" >"$tmp/deny" 2>/dev/null || true
+rc=0
+grep -E -f "$tmp/deny" /dev/null 2>/dev/null || rc=$?
+if [[ ! -s $tmp/deny ]] || ((rc > 1)); then
+  echo "retro-evidence: no valid denylist at ${deny/#"$HOME"/\~}; refusing to read transcripts" >&2
+  exit 2
+fi
+enc=${HOME//\//-}
+# A term hides from word-boundary patterns inside snake_case or camelCase, so
+# every check also reads a copy with _ as a space and capitals split.
+norm() { sed -E 's/_/ /g; s/([a-z0-9])([A-Z])/\1 \2/g'; }
+# Files, not pipes: under pipefail, grep -q quitting early would read as no match.
+private() {
+  cat >"$tmp/chk"
+  grep -q -i -E -f "$tmp/deny" "$tmp/chk" && return 0
+  norm <"$tmp/chk" >"$tmp/chk.norm"
+  grep -q -i -E -f "$tmp/deny" "$tmp/chk.norm"
+}
+
+# ---- prompts ----------------------------------------------------------------
+read_n=0 skipped=0 printmode=0
+: >"$tmp/prompts"
+: >"$tmp/uuids"
+for dir in "$config"/projects/*/; do
+  [[ -d $dir ]] || continue
+  name=$(basename "$dir")
+  name=${name//"$enc"/\~}
+  if private <<<"$name"; then
+    skipped=$((skipped + $(find "$dir" -maxdepth 1 -name '*.jsonl' -newermt "$since" | wc -l)))
+    continue
+  fi
+  while IFS= read -r t; do
+    entry=$(jq -n -r 'first(inputs | .entrypoint // empty) // ""' "$t" 2>/dev/null || true)
+    if [[ $entry == sdk* ]]; then printmode=$((printmode + 1)); continue; fi
+    { jq -c 'select(.type != "attachment")' "$t" 2>/dev/null || true; } |
+      sed -e "s|$HOME|~|g" -e "s|$enc|~|g" >"$tmp/records"
+    # Raw JSON hides a term behind an escape such as \n, so check decoded strings too.
+    # Whitespace is collapsed so a two-word term split by a newline still matches.
+    if private <"$tmp/records" ||
+      { jq -r '.. | strings | gsub("\\s+"; " ")' "$tmp/records" 2>/dev/null || true; } | private; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    read_n=$((read_n + 1))
+    # Typed prompts only: no tool results, injected or harness text, or command echoes.
+    { jq -r --arg p "$name" --arg since "$since" '
+        select(.type == "user" and (.isMeta | not) and (.isCompactSummary | not) and ((.timestamp // "") >= $since))
+        | . as $r
+        | .message.content
+        | (if type == "string" then . else ([.[]? | select(.type == "text") | .text] | join(" ")) end)
+        | select(length > 0)
+        | select((startswith("<") or startswith("[Request interrupted") or startswith("This session is being continued") or startswith("Caveat:")) | not)
+        | gsub("\\s+"; " ") | .[0:240]
+        | "\($r.uuid // "")\t\($r.sessionId // "")\t\(($r.timestamp // "")[0:10])\t\($p)\t\(.)"' "$tmp/records" 2>/dev/null || true; } |
+      while IFS=$'\t' read -r uuid session day project text; do
+        if [[ -n $uuid ]] && grep -q -x -F -e "$uuid" "$tmp/uuids"; then continue; fi
+        [[ -n $uuid ]] && echo "$uuid" >>"$tmp/uuids"
+        printf '%s\t%s\t%s\t%s\n' "$session" "$day" "$project" "$text" >>"$tmp/prompts"
+      done
+  done < <(find "$dir" -maxdepth 1 -name '*.jsonl' -newermt "$since")
+done
+
+# ---- report -------------------------------------------------------------------
+{
+  echo "Retro evidence since $since: $read_n sessions read, $skipped skipped (denylist), $printmode print-mode runs excluded"
+  echo
+  echo "## Friction log"
+  for f in "$root"/retros/friction/*.md "$root"/retros/friction.md; do
+    [[ -f $f ]] && sed 's/^/- /' "$f"
+  done
+  base=main
+  git -C "$root" rev-parse --verify -q main >/dev/null 2>&1 || base=origin/main
+  for ref in $(git -C "$root" for-each-ref --format='%(refname:short)' refs/heads/papercut refs/remotes/origin/papercut 2>/dev/null); do
+    { git -C "$root" diff --no-color "$base"..."$ref" -- retros/friction retros/friction.md 2>/dev/null || true; } |
+      awk -v ref="$ref" '/^\+[0-9][0-9][0-9][0-9]-/ { print "- " substr($0, 2) " (open branch " ref ")" }'
+  done
+  echo
+  echo "## Skill usage (uses, days since last use)"
+  jq -r --argjson now "$(date +%s)" '.skillUsage // {} | to_entries[]
+    | "\(.key)\t\(.value.usageCount // 0)\t\(((($now * 1000) - (.value.lastUsedAt // 0)) / 86400000) | floor)"' \
+    "$HOME/.claude.json" 2>/dev/null | sort -t$'\t' -k3,3n |
+    awk -F'\t' '{ printf "- %s: %s uses, %s days\n", $1, $2, $3 }' || true
+  echo
+  echo "## Corrections (the author redirecting the model)"
+  cut -f4 "$tmp/prompts" >"$tmp/texts"
+  { grep -n -i -E "(\\bno[,.]|\\b(don't|do not|stop|wrong|instead|actually|not what|i said|again|revert|undo|why did you)\\b)" "$tmp/texts" || true; } |
+    cut -d: -f1 | head -60 | while read -r n; do
+      awk -F'\t' -v n="$n" 'NR == n { printf "- %s %s: %s\n", $2, $3, $4 }' "$tmp/prompts"
+    done
+  echo
+  echo "## Repeated in two or more sessions"
+  awk -F'\t' '{ k = tolower($4); gsub(/[^a-z0-9 ]/, "", k); gsub(/ +/, " ", k); k = substr(k, 1, 80)
+               if (length(k) < 12) next; if (!((k, $1) in seen)) { seen[k, $1] = 1; n[k]++; ex[k] = $4 } }
+       END { for (k in n) if (n[k] > 1) printf "%d\t%s\n", n[k], ex[k] }' "$tmp/prompts" |
+    sort -rn | head -30 | awk -F'\t' '{ printf "- %d sessions: %s\n", $1, $2 }'
+} >"$tmp/report"
+
+# Last line of defense: no output line may match the denylist.
+: >"$tmp/out"
+withheld=0
+while IFS= read -r line; do
+  if printf '%s\n' "$line" | private; then withheld=$((withheld + 1)); else printf '%s\n' "$line" >>"$tmp/out"; fi
+done <"$tmp/report"
+sed -e "s|$HOME|~|g" "$tmp/out"
+((withheld == 0)) || echo "($withheld lines withheld: they match the denylist)"

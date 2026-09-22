@@ -1,0 +1,34 @@
+# harness-retro smoke case, typed: /loadout:harness-retro in a small loadout-like
+# checkout with stub measurements and a friction log where one friction appears
+# twice. The retro should write a dated retro file on a retro branch, commit it, cite
+# evidence for each proposal and rank the repeated friction first. The files target
+# holds only uncommitted changes, so the write is checked in the trace. Run with --scaffold
+# --allow-tools Bash Edit Write.
+schema_version: "1.1"
+name: harness-retro-smoke
+tags: [smoke, harness-retro]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Edit, Write, Bash]
+  prompt: "/loadout:harness-retro and when you are done, show me the retro file you wrote."
+graders:
+  - name: retro-file-written
+    type: regex
+    target: trace
+    pattern: '"name":"(?:Write|Edit)","input":\{[^}]*"file_path":"[^"]*retros/\d{4}-\d{2}-\d{2}\.md"'
+  - name: on-a-retro-branch
+    type: tool_used
+    tool: Bash
+    input_match: '(switch|checkout) (-c|-b) retro/'
+  - name: committed
+    type: tool_used
+    tool: Bash
+    input_match: 'git commit'
+  - name: evidence-and-ranking
+    type: llm
+    focus: trace
+    criteria: "Find the Write call in the trace that creates retros/<date>.md and judge the content it writes. Pass only if each proposal in it cites its evidence (friction log entries with their dates, counts, or numbers from the scripts), and the formatter friction, which the friction log records twice and a correction repeats, is ranked as the first or most important proposal. Fail if no retro file is written, if proposals carry no evidence, or if another item is ranked above the formatter friction."

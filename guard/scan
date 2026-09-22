@@ -5,12 +5,15 @@
 #   guard/scan range <revs>  commits in a git log range: paths, diffs, messages, emails
 #   guard/scan --all         every commit on every ref
 #   guard/scan msg <file>    a commit message without git's comments, or ref names
+#   guard/scan text <file>   any text headed for GitHub, whole: a PR title or body
 #   guard/scan tag <object>  an annotated tag: its name, message and tagger email
 #
 # Three checks: the private denylist (never in this repo), secret patterns, and
 # emails against guard/allowed-emails, where "committer-only <email>" admits an
 # address as committer only (GitHub's merge commits). Findings name a location and
 # a denylist line number, never the matched text; a path that matches is withheld.
+# A term inside snake_case or camelCase hides from word-boundary patterns, so the
+# denylist also runs over a copy with _ read as a space and capitals split.
 # Exit 0 clean, 1 findings, 2 error.
 #
 # GUARD_DENYLIST            denylist path (default ~/.config/loadout-guard/denylist)
@@ -39,6 +42,7 @@ secrets=(
 printf '%s\n' "${secrets[@]}" >"$tmp/secrets"
 
 finding() { printf 'guard: %s\n' "$*" >>"$findings"; }
+norm() { sed -E 's/_/ /g; s/([a-z0-9])([A-Z])/\1 \2/g'; }
 tilde() { printf '%s' "${1/#"$HOME"/\~}"; }
 
 # grep -n into $tmp/hits. Status 2 (a bad pattern, an unreadable file) stops the
@@ -103,7 +107,7 @@ where() {  # line number in $tmp/where; withholds a path that matches the denyli
   line=${loc##*:}
   path=${loc#*:}
   path=${path%:*}
-  if [[ -s $tmp/deny ]] && grep -q -a -i -E -f "$tmp/deny" <<<"$path"; then
+  if [[ -s $tmp/deny ]] && { grep -q -a -i -E -f "$tmp/deny" <<<"$path" || norm <<<"$path" | grep -q -a -i -E -f "$tmp/deny"; }; then
     path='(path withheld, it matches the denylist)'
   fi
   printf '%s:%s:%s' "$commit" "$path" "$line"
@@ -113,15 +117,20 @@ check_records() {
   [[ -s $tmp/text ]] || return 0
   local n line i pat hit
   if [[ -s $tmp/deny ]]; then
+    norm <"$tmp/text" >"$tmp/text.norm"
     hits "$tmp/deny" "$tmp/text" -i
-    while IFS=: read -r n _; do
+    cut -d: -f1 "$tmp/hits" >"$tmp/lines"
+    hits "$tmp/deny" "$tmp/text.norm" -i
+    cut -d: -f1 "$tmp/hits" >>"$tmp/lines"
+    while read -r n; do
       line=$(sed -n "${n}p" "$tmp/text")
+      nline=$(sed -n "${n}p" "$tmp/text.norm")
       hit='?'
       while IFS=: read -r i pat; do
-        if grep -q -a -i -E -e "$pat" <<<"$line"; then hit=$i; break; fi
+        if grep -q -a -i -E -e "$pat" <<<"$line" || grep -q -a -i -E -e "$pat" <<<"$nline"; then hit=$i; break; fi
       done < <(grep -n -v -e '^[[:space:]]*$' "$deny")
       finding "denylist line $hit matches at $(where "$n")"
-    done <"$tmp/hits"
+    done < <(sort -un "$tmp/lines")
   fi
   hits "$tmp/secrets" "$tmp/text"
   while IFS=: read -r n _; do
@@ -172,6 +181,11 @@ case "${1:-}" in
     { printf '\001COMMIT message\n'; cat "$tmp/msg"; printf '\n\001ENDMSG\n'; } | records
     check_records
     ;;
+  text)
+    [[ -r ${2:-} ]] || { echo "usage: guard/scan text <file>" >&2; exit 2; }
+    { printf '\001COMMIT text\n'; cat "$2"; printf '\n\001ENDMSG\n'; } | records
+    check_records
+    ;;
   tag)
     [[ $(git cat-file -t "${2:-}" 2>/dev/null) == tag ]] || { echo "usage: guard/scan tag <tag object>" >&2; exit 2; }
     { printf '\001COMMIT tag\n'; git cat-file tag "$2"; printf '\n\001ENDMSG\n'; } | records
@@ -180,7 +194,7 @@ case "${1:-}" in
     email_ok "$tagger" || finding "the tagger email of tag object ${2:0:10} is not in guard/allowed-emails"
     ;;
   *)
-    sed -n '2,17s/^# \{0,1\}//p' "$0" >&2
+    awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" >&2
     exit 2
     ;;
 esac
