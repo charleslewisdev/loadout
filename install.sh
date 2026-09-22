@@ -59,7 +59,10 @@ kind=$(jq -r '.extraKnownMarketplaces.loadout.source.source' <<<"$wanted")
 url=$(jq -r '.extraKnownMarketplaces.loadout.source | .url // .repo' <<<"$wanted")
 want_ref=$(jq -r '.extraKnownMarketplaces.loadout.source.ref // empty' <<<"$wanted")
 # Re-add when the registered source differs in kind, location or ref: adding under
-# the same name replaces the old registration.
+# the same name replaces the old registration. This must come after the merge above:
+# the CLI refuses a source that differs from the one settings declare for the name.
+# The add also rewrites that settings entry, so extra keys beside its source (such
+# as autoUpdate) do not survive a re-add.
 if ! claude plugin marketplace list --json |
   jq -e --arg kind "$kind" --arg url "$url" --arg ref "$want_ref" '
     any(.[]; .name == "loadout" and .source == $kind and ((.url // .repo) == $url) and ((.ref // "") == $ref))' >/dev/null; then

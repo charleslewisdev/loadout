@@ -22,7 +22,7 @@ Contents:
 
 My earlier harnesses didn't fail by being wrong. They worked, then gathered rules, skills and plugins for a year, until I couldn't say what any one of them cost or whether it helped. Research on instruction files finds the same pattern. Across 1,867 repositories, 77.3 percent of instructions that disappear from a file go in a wholesale rewrite or a move to a sibling file, and afterwards the file grows faster, 4.9 against 4.1 percent per commit ([arXiv 2608.11095](https://arxiv.org/abs/2608.11095)). Files mostly shrink by being rewritten, and then they grow back faster.
 
-Anthropic moved the other way with its own prompt: "We removed over 80% of Claude Code's system prompt for models like Claude Opus 5 and Claude Fable 5 with no measurable loss on our coding evaluations." ([claude.com blog](https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models)). A harness that mostly adds instructions works against a model that needs fewer of them.
+Anthropic moved the other way with its own prompt: "We removed over 80% of Claude Code's system prompt for models like Claude Opus 5 and Claude Fable 5 with no measurable loss on our coding evaluations." ([claude.com blog](https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models)).
 
 So the first thing I built was a number. The harness share is the tokens my setup adds to every session before the first prompt, and one command measures it:
 
@@ -33,7 +33,7 @@ claude -p "Reply with exactly the word OK and nothing else." --model haiku --out
 
 Run it three ways in an empty directory. `--safe-mode` gives the vendor floor: the system prompt, built-in tools and bundled skills, with every customization dropped. `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` gives the floor plus everything I added. Plain gives both plus the auto-memory section. The share is the second minus the first. `scripts/budget` does this, adds a fourth run with an empty strict MCP config to isolate MCP servers, and caches the result for the statusline.
 
-Before loadout the share was 4,474 tokens. With loadout in place of the old setup it is 3,268, of which 1,514 are the claude.ai connectors. The ceiling is 6,000.
+Before loadout the share was 4,474 tokens. With loadout installed, and one legacy plugin and some community skills still loading until I remove them, three runs gave 1,754 to 3,268; the high run includes 1,514 tokens of claude.ai connectors. The ceiling is 6,000.
 
 What I learned about reading that number:
 
@@ -46,15 +46,15 @@ What I learned about reading that number:
 
 Haiku is the measuring model because it has the smallest window in regular use, so truncation shows there first.
 
-**How I checked claims.** The design went through three written passes, a measured review with five reviewers who each had one mandate (evidence, developer experience, deletion, implementation, voice), my own review, and a build gate before each phase. Two rules governed evidence. A number comes from a command run on my machine or carries a source. A sentence attributed to Anthropic is pasted, never paraphrased. The review found 28 errors in the second pass, and every one sat in paraphrase; none sat in the research notes it summarised. I'd keep both rules for any harness you intend to publish.
+**Two evidence rules.** A number comes from a command run on my machine or carries a source. A sentence attributed to Anthropic is pasted, never paraphrased. A review of an early draft found 28 errors, and every one sat in a paraphrase; none sat in the research notes it summarized. I'd keep both rules for any harness you intend to publish.
 
 ## 2. Where instructions live
 
 Each kind of instruction gets one home, chosen by how that home reaches the model and what it costs per session. The layer table is in the [README](README.md#the-layers). Here is why it looks the way it does.
 
-I put a logging proxy in front of the API and read what each layer actually sends. The output style arrives as a `# Output Style:` block in the first user message, next to CLAUDE.md. The docs say the same about CLAUDE.md: it is "delivered as a user message after the system prompt" ([memory docs](https://code.claude.com/docs/en/memory)). With a style active, the system prompt changes one sentence: "You are an interactive agent that helps users according to your "Output Style", which describes how you should respond to user queries." A 32-token reminder of the style runs before each prompt. Subagents never get the style. It survived `/compact` in a probe, because compaction rebuilds the first message from disk.
+I put a logging proxy in front of the API and read what each layer actually sends. The output style arrives as a `# Output Style:` block in the first user message, next to CLAUDE.md. The docs say the same about CLAUDE.md: it is "delivered as a user message after the system prompt" ([memory docs](https://code.claude.com/docs/en/memory)). With a style active, the system prompt changes one sentence: "You are an interactive agent that helps users according to your "Output Style", which describes how you should respond to user queries." A 32-token reminder of the style runs before each prompt. A fresh subagent never gets the style; a fork inherits it with the parent's conversation. It survived `/compact` in a probe, because compaction rebuilds the first message from disk.
 
-So the style has no system-prompt privilege. It wins over CLAUDE.md for register on three narrower facts: the reminder, that one sentence, and subagent isolation. I originally believed the style sat in the system prompt, and before that, that CLAUDE.md got "buried in the middle of a long context". Chroma's *Context Rot* study found no notable variation across 11 needle positions in 18 models on its needle-in-a-haystack task ([Chroma](https://www.trychroma.com/research/context-rot)), so position wasn't the reason either. The layout survived both corrections; the reasons changed.
+So the style has no system-prompt privilege. It wins over CLAUDE.md for register on three narrower facts: the reminder, that one sentence, and fresh subagents going without it. I originally believed the style sat in the system prompt, and before that, that CLAUDE.md got "buried in the middle of a long context". Chroma's *Context Rot* study found no notable variation across 11 needle positions on its needle-in-a-haystack task ([Chroma](https://www.trychroma.com/research/context-rot)), so position wasn't the reason either.
 
 Alternatives I rejected:
 
@@ -67,15 +67,15 @@ One trap: session-start hook output enters context and is sent again after every
 
 I also dropped a planned session-context hook (branch, dirty count, worktree). Claude Code already puts the current branch, main branch, git status and recent commits into every session started in a repo. The hook would have repeated them for about 80 tokens per session and per compaction.
 
-**Shipping it.** The repo is a plugin marketplace, and an installer merges one JSON profile into `~/.claude/settings.json`. A plugin alone can't do it: a plugin can't set `outputStyle` or ship your user CLAUDE.md, and its own `settings.json` can set only `agent` and `subagentStatusLine`. I rejected a `directory` marketplace, which my old setup used, because it stores an absolute path in `~/.claude/plugins/known_marketplaces.json` and works only where the checkout sits at the same path. While the repo was private, the profile used a `git` source over HTTPS: the SSH form needed a key the machine didn't have, and the CLI turns off credential helpers for some background git calls. It moved to a `github` source when the repo went public.
+**Shipping it.** The repo is a plugin marketplace, and an installer merges one JSON profile into `~/.claude/settings.json`. A plugin alone can't do it: a plugin can't set `outputStyle` or ship your user CLAUDE.md, and its own `settings.json` can set only `agent` and `subagentStatusLine`. I rejected a `directory` marketplace, which my old setup used, because it stores an absolute path in `~/.claude/plugins/known_marketplaces.json` and works only where the checkout sits at the same path. A private marketplace repo is harder than a public one. A `github` source clones over HTTPS, and the CLI turns off credential helpers for some background git calls, so a background refresh of a private repo can fail. Either register an SSH key, or use a `git` source and set `CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1` so a failed refresh keeps the existing clone. A public repo needs neither.
 
 ## 3. Budgets
 
 Every always-on surface has a target and a ceiling. The table with current values is in the [README](README.md#budgets-for-each-surface). The bases:
 
 - **Harness share: 6,000 tokens, target about 3,000.** About 3 percent of a 200k window above the floor. The target is what's left once the legacy setup is gone.
-- **Output style: 100 lines and 1,000 tokens, target 60 lines and 600.** Anthropic's built-in styles run 250 to 370 tokens. Mine is 24 lines, about 506 tokens.
-- **CLAUDE.md: 200 lines.** The docs say "target under 200 lines per CLAUDE.md file". I keep the ceiling for token cost, not adherence: a factorial study measured compliance of 60.0, 65.2, 67.7 and 64.0 percent at 25, 100, 250 and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still warn that "Bloated CLAUDE.md files cause Claude to ignore your actual instructions!" ([best practices](https://code.claude.com/docs/en/best-practices)), and in practice rule count is the better worry.
+- **Output style: 100 lines and 1,000 tokens, target 60 lines and 600.** Anthropic's built-in styles run 250 to 370 tokens, more when they carry examples. Mine is 24 lines, about 506 tokens.
+- **CLAUDE.md: 200 lines.** The docs say "target under 200 lines per CLAUDE.md file". I keep the ceiling for token cost, not adherence: a factorial study measured compliance of 60.0, 65.2, 67.7 and 64.0 percent at 25, 100, 250 and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still warn that "Bloated CLAUDE.md files cause Claude to ignore your actual instructions!" ([best practices](https://code.claude.com/docs/en/best-practices)).
 - **SKILL.md: 500 lines, target 150.** The docs: "Keep `SKILL.md` under 500 lines." A used skill body stays in context for the rest of the session and rides through compaction.
 - **Skill descriptions: 200 characters each, 5,000 for the whole harness.** See [Skills](#5-skills).
 - **Session-start output: 300 characters.** It's re-sent after every compaction.
@@ -86,24 +86,17 @@ The prune test comes from Anthropic's best practices: "For each line, ask: *"Wou
 
 ## 4. Voice
 
-Register lives in one forced output style, `peer`. It describes me as the reader: a senior engineer who wants a peer, with database design as the one area where it should explain its reasoning and flag risks. It asks for plain language, sentences around twenty words, and every reference explained before it's used. The wording is **opinion**.
+The README covers [what the style asks for and what the evals cut](README.md#identity-and-voice). This section is for anyone writing their own style.
 
-**Delivery.** The style ships in the plugin with `force-for-plugin: true`, and the installer also sets `outputStyle: "loadout:peer"`. Both are needed. In the binary, the per-prompt reminder returns nothing when `outputStyle` is unset, before it looks at forced styles, so forcing alone delivers the body without the reminder. The eval sandbox can't set `outputStyle`, so only a forced style can be evaluated at all. One trap for anyone testing styles: the sandbox's session record says `output_style: default` even when the forced style is applied. A probe asking the model to quote its style confirmed the body arrives.
+**Force it and set it.** The style ships in the plugin with `force-for-plugin: true`, and the installer also sets `outputStyle`. In the binary, the per-prompt reminder returns nothing when `outputStyle` is unset, before it looks at forced styles, so forcing alone delivers the body without the reminder. The eval sandbox can't set `outputStyle`, so only a forced style can be evaluated at all. One trap: the sandbox's session record says `output_style: default` even when the forced style is applied. A probe asking the model to quote its style confirmed the body arrives.
 
-**What a style can do.** Make sessions better to work in. That's the whole claim, and I treat it as a comfort trade. Across 162 personas, four model families and 2,410 factual questions, no persona improved on a no-persona control ([Zheng et al.](https://aclanthology.org/2024.findings-emnlp.888/)). I don't sell the style as capability.
+**Test each rule on its own.** Give each rule a with-and-without case and one grader, so its effect shows alone. Packing mattered more than wording: the em-dash rule held in 1 of 5 runs as a clause in a list and 9 of 10 as its own sentence. A case can be wrong too. My wrong-premise case first looked like a rule that failed to fire; a review then found a malformed code fence in its prompt, and after the fix it scored the same in both arms.
 
-**What it can't do.** It never reaches subagents; I use that on purpose, because reviewers run in subagents that the style can't soften. It overrides any style you pick while its plugin is enabled. And it doesn't hold up in long written artifacts: a retro file written under the forced style still drew em-dashes.
+**Expect most of it to be default already.** Anthropic's best practices say it outright: "If Claude already does something correctly without the instruction, delete it or convert it to a hook." ([best practices](https://code.claude.com/docs/en/best-practices)). The research behind my question rule is sound: non-questions (statements of belief or conviction) drew 24 percentage points more sycophancy than questions, and asking beat an explicit "don't be sycophantic" instruction ([UK AISI, arXiv 2602.23971](https://arxiv.org/abs/2602.23971)). On my cases, Sonnet 5 and Opus 5 caught the planted errors without it, so it went, with four other rules. Three rules have no case at all: relaying reviewer findings with their severity, the database-and-performance exception, and resolving every reference before using it. They stay as untested opinion. The filler-word rule stays without a delta, because the baseline already avoided those words on the test prompt.
 
-**What the evals cut.** I gave every rule a case that runs with and without the plugin, with one grader per rule so each effect shows on its own. A rule with no delta goes.
+**Know what it can't reach.** A fresh subagent never gets the style; a fork inherits the parent's conversation, style included ([output styles docs](https://code.claude.com/docs/en/output-styles)). That's why `/loadout:code-review` briefs fresh subagents: a review the style could soften is worth less. The style also doesn't hold up in long written artifacts: a retro file written under it still drew em-dashes.
 
-- **Packing matters.** As one clause in a list of banned things, the em-dash rule held in 1 of 5 runs. As its own sentence, "Never write the em-dash character; use a comma, a colon or a new sentence.", it held in 9 of 10.
-- **Most anti-sycophancy rules were already default behavior.** The style began with rules to restate claims and design calls as questions, hold a recommendation under pushback unless a new argument arrives, ask or state assumptions, decline requests built on a wrong premise, and a sentence welcoming humor. Eighteen cases on Sonnet 5, rerun on Opus 5 where they showed nothing, scored the same with and without each rule. All five went. The research behind the question rule is sound: statements drew 24 percentage points more sycophancy than questions, and rephrasing beat an explicit "don't be sycophantic" instruction ([UK AISI, arXiv 2602.23971](https://arxiv.org/abs/2602.23971)). On my cases, both models already caught the planted errors without it.
-- **A case can be wrong too.** The wrong-premise case first looked like a rule that failed to fire. A review then found a malformed code fence in its prompt; after the fix it scored the same in both arms.
-- **What stayed.** The writing rules (0.97 against 0.87 after the cut) and one sentence added later, run the project's checks before saying work is done (0.17 to 0.33 against 0). The filler-word rule showed no difference on the first prompt because the baseline already avoided those words; it stays until a prompt that elicits them can judge it.
-
-The length rule adapts a line from Dan Hopwood's example style: "Length scales with what the user has to decide, not with the work behind it – a heavy session with one decision gets a short message." ([Hopwood](https://danhopwood.com/posts/two-ways-to-change-claudes-personality)).
-
-**Writing as me in public** is a separate, typed-only skill, `/loadout:write-as-me`: first person, no em-dashes, emoji only as list markers, and it drafts without posting. Its first eval's delta turned out to be mostly the style's own em-dash rule, because the style loads in the with-plugin arm. Grade what only the skill asks for.
+**Borrow, and keep public voice separate.** The length rule adapts a line from Dan Hopwood's example style: "Length scales with what the user has to decide, not with the work behind it – a heavy session with one decision gets a short message." ([Hopwood](https://danhopwood.com/posts/two-ways-to-change-claudes-personality)). Writing as me in public is a separate, typed-only skill, `/loadout:write-as-me`. Its first eval's delta turned out to be mostly the style's own em-dash rule, because the style loads in the with-plugin arm. Grade what only the skill asks for.
 
 ## 5. Skills
 
@@ -113,11 +106,11 @@ I first believed skills past about 40 were evicted and a new one "may simply nev
 
 So each description stays under 200 characters and says what the skill does and when to use it; all eleven together are 1,782 characters, and the five the model can pick are 860. The listing on Haiku is still over budget, 48 skills and 21,698 characters against 8,000, almost all from bundled skills, account-synced skills and a legacy plugin I'm removing. I rejected a custom skill index and a raised budget: capping descriptions is cheaper than either.
 
-**Intake.** A skill from outside arrives with `disable-model-invocation: true` and earns its place. A skill written here is invoked once by name after it lands, so its usage score starts above zero. superpowers was disabled the day its replacements landed. It cost about 2,540 tokens per session and injected: "If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill." Anthropic's guidance goes the other way: "Where you might have said "CRITICAL: You MUST use this tool when...", you can use more normal prompting like "Use this tool when..."." ([prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)).
+**Intake.** A skill from outside arrives with `disable-model-invocation: true` and earns its place. A practitioner's three skill audits reached the same rule: "Disable unused skills the moment they're added." ([dev.to](https://dev.to/shimo4228/15-days-of-skill-sprawl-in-claude-code-lessons-from-3-audits-27em)). A skill written here is invoked once by name after it lands, so its usage score starts above zero. superpowers was disabled the day its replacements landed. It cost about 2,540 tokens per session and injected: "If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill." Anthropic's guidance goes the other way: "Where you might have said "CRITICAL: You MUST use this tool when...", you can use more normal prompting like "Use this tool when..."." ([prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)).
 
 **When a skill never fires.** Two of my skills became typed-only after their evals:
 
-- `code-verify` fired in 0 of 6 runs across two descriptions. Without superpowers' "MUST invoke" injection, nothing prompted the model to call a verification skill. Its rule moved into the style as one sentence, which did change behavior.
+- `code-verify` fired in 0 of 6 runs across two descriptions. Without superpowers' "MUST invoke" injection, nothing prompted the model to call a verification skill. Its rule moved into the style as one sentence, which changed how replies report checks, though not whether the model runs them.
 - `code-review` collided with a bundled skill of the same name, and the model picked the bundled one. Check a new name against the bundled skills before writing the skill.
 
 A skill can also make things worse. `git-pr`'s claim-check step, meant to stop PR descriptions from repeating false claims in commit messages, produced 3 clean descriptions out of 6, against 5 of 6 without the skill. Only the with-and-without eval showed it.
@@ -137,10 +130,11 @@ Lessons from running them:
 - **"Passes" means a positive delta.** At three runs a 0.8 threshold can't tell 0.67 from 0.8 reliably, so I treat it as advisory. Cases that must separate close scores run five times per arm.
 - **The Haiku judge is noisy both ways.** It failed a reply that said plainly no tests were included, and passed one that claimed a function already on main. Read transcripts (`--keep-temp`) before trusting a surprising score.
 - **Check what the grader reads.** An `llm` grader reads the last message by default. My retro case wrote a correct file and failed 6 of 6 because the judge never saw the file. The `files` target holds only uncommitted changes, and `tool_order` compares only the first matching calls.
-- **Graders can be too literal.** This README's own test, a fresh session answering four questions from the README alone, failed "how do I add a skill" 6 of 6 while the answer was complete: my criterion named a path pattern the answer spelled differently.
+- **Use `regex` for facts, `llm` for judgment.** The README's own test, a fresh session answering four questions from the README alone, failed "how do I add a skill" in 6 of 6 runs while every answer was complete. A reworded criterion still failed 2 of 6, again on complete answers. That question now uses four `regex` graders, one per fact the answer needs.
+- **A document test has no delta.** The README test gives both arms the same README, so its with-minus-without delta is about zero by design. It passes when every answer is complete, not on a delta.
 - **Know the sandbox.** It scrubs `HOME` and custom environment variables. Scaffold scripts run from their own path, so a fixture can copy files from the repo. On Ubuntu, sandboxed Bash needs a bubblewrap AppArmor profile; without it, every shell-dependent case measures a broken sandbox.
 
-Research on tuning guidance points the same way: repository guidance tuned with synthetic bug-fix probes resolved 33.0 percent of SWE-bench Verified tasks, against 28.3 for the static knowledge base it started from and 25.5 unguided ([arXiv 2606.20512](https://arxiv.org/abs/2606.20512)). Measured guidance beats guidance that merely reads well.
+Research on tuning guidance points the same way: repository guidance tuned with synthetic bug-fix probes resolved 33.0 percent of SWE-bench Verified tasks, against 28.3 for the static knowledge base it started from and 25.5 unguided ([arXiv 2606.20512](https://arxiv.org/abs/2606.20512)).
 
 ## 7. Hooks and memory
 
@@ -156,7 +150,7 @@ Research on tuning guidance points the same way: repository guidance tuned with 
 
 Every hook runs through `hook-timed`, which logs its start and end, and the lint fails any hook command that bypasses it. A hook over budget for a week gets deleted. The formatter is scoped because my old global formatter rewrote whole files in repos that don't use prettier. The notification hook returns its escape sequence in the hook output's `terminalSequence` field, which the binary describes as "A terminal escape sequence (e.g. OSC 9 / OSC 777 desktop-notification) for Claude Code to emit on your behalf". The Bash guard stays empty until a case appears that `permissions.deny` can't express.
 
-**Memory.** I had four overlapping memory stores installed, and knowledge was written far more often than it was read. Now there's one: Claude Code's native auto-memory, an index plus one file per fact, loaded per project. Transcripts are the raw record, kept 120 days (`cleanupPeriodDays`; the default is 30) and searched with grep. Nothing summarises them.
+**Memory.** I had four overlapping memory stores installed, and knowledge was written far more often than it was read. Now there's one: Claude Code's native auto-memory, an index plus one file per fact, loaded per project. Transcripts are the raw record, kept 120 days (`cleanupPeriodDays`; the default is 30) and searched with grep. Nothing summarizes them.
 
 I rejected model-written summaries, which the first draft of the design had. In one study of repeated consolidation, "memory utility first rises, then degrades, and can fall below the no-memory baseline" ([arXiv 2605.12978](https://arxiv.org/abs/2605.12978)). That's ARC-AGI with GPT-5.4, not a coding workload, so the evidence is thin. I keep raw records anyway, because that's the cheaper and reversible choice. I also rejected a vector memory server: grep over a few thousand files is free.
 
@@ -166,31 +160,24 @@ I also rejected a memory-retrieval order in the style. The system prompt already
 
 ## 8. Reference material
 
-The budgets govern what loads by itself, and reference material never should: a 2,000-term glossary, a map of issue-tracker boards, a table of every teammate's handle. The six-rung ladder is in the [README](README.md#when-reference-material-outgrows-the-budgets). The short version: put each piece on the first rung that fits how it's used, from a pointer line in CLAUDE.md (rung 1) through path-scoped rules, skill bodies, files beside `SKILL.md` and a data file plus `grep`, to a live query against the system that owns the data (rung 6).
+The six-rung ladder, the measurement behind it and the three splits that don't work are in the [README](README.md#when-reference-material-outgrows-the-budgets). Two points behind it:
 
-The rungs rest on measurement and on two lines from Anthropic's [skill authoring guide](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices): "Only the script's output consumes tokens", and "Reference files, data, or documentation don't consume context tokens until actually read". I measured one rung myself: a 40-line rule scoped with `paths` added 0 tokens at turn 0 and loaded only after a matching file was read. The same rule without `paths` added 978 tokens to every session.
-
-Three splits look like savings and aren't:
-
-- **`@` imports.** "Imported files are expanded and loaded into context at launch" ([memory docs](https://code.claude.com/docs/en/memory)), so the split files load anyway.
-- **Nested references.** On a reference file that links to another, Anthropic warns: "Claude might use commands like `head -100` to preview content rather than reading entire files, resulting in incomplete information." Keep references one level deep.
-- **A table in a skill body.** It stays in context after use and rides through compaction.
-
-**Opinion.** A glossary goes on rung 5: one `glossary.tsv`, one pointer line naming the file and the `grep`, nothing loaded until a term comes up. The price of every rung above 1 is that the model has to choose to look, so every pointer names the file and the command. A table of people is personal data; keep it out of public repos, and at a company query the directory rather than copying it.
+- **Pick the rung by how often it's needed, not by size.** A 40-line rule needed in one directory belongs on rung 2 whatever its length; a 20-line table needed once a month belongs on rung 5. Size decides only whether a rung-4 file needs a contents list, which Anthropic suggests past 100 lines so a partial read still shows the file's scope.
+- **Every rung above 1 depends on the model choosing to look.** So every pointer names the file and the command, and a pointer nobody follows is worth checking in the retro's unread-memory list.
 
 ## 9. Keeping it small
 
 Maintenance is a few tools, all built before the first skill.
 
-**The retro.** `/loadout:harness-retro` runs every 90 days at most, and sooner when a memory index passes 100 lines or a skill passes 500. It works on a `retro/<date>` branch, reads the friction log, my corrections in recent transcripts, memory files nobody read in 90 days, the budgets and skill usage, and writes one dated file that lists each proposal with its evidence. It ends in one pull request; nothing reaches rules or skills until I merge it, and changes to local memory are applied in the session only on my yes. The first retro proposed no repository changes, carried 12 of 63 live memories out of an MCP memory server into project memory, and cut two indexes from 156 and 144 lines to 21 and 19.
+**The retro.** `/loadout:harness-retro` runs every 90 days at most, and sooner when the skill listing overflows on the smallest model, a memory index passes 100 lines or a skill passes 500. Pick triggers the harness controls: my listing trigger fires permanently, because bundled and account-synced skills alone overflow the Haiku budget. It works on a `retro/<date>` branch, reads the friction log, my corrections in recent transcripts, memory files nobody read in 90 days, the budgets and skill usage, and writes one dated file that lists each proposal with its evidence. It ends in one pull request; nothing reaches rules or skills until I merge it, and changes to local memory are applied in the session only on my yes. The first retro proposed no repository changes; its work was memory, cutting the two largest indexes from 156 and 144 lines to 21 and 19.
 
 I rejected scheduled rewrites of instruction files, since wholesale rewrites are exactly how files lose instructions and then regrow. If two retro dates pass with nothing produced, the fallback is a calendar reminder to run `/skill-doctor` and delete.
 
-A retro skill needs narrow permissions. Its first draft allowed `Bash(git *)`, which pre-approved `git push origin HEAD:main` on an unprotected branch; unscoped Read, Edit and Write pre-approved memory edits the procedure said to wait for. Instructions alone didn't hold: in sandbox runs the model read files the skill told it not to. List the exact commands a skill needs.
+A retro skill needs narrow permissions. Its first draft allowed `Bash(git *)`, which pre-approved `git push origin HEAD:main` on an unprotected branch; unscoped Read, Grep and Glob pre-approved reading transcripts, and unscoped Edit and Write pre-approved memory edits the procedure said to wait for. Instructions alone didn't hold: in sandbox runs the model read files the skill told it not to. List the exact commands a skill needs.
 
 **Papercut.** `/loadout:harness-papercut` writes one annoyance to its own dated file under `retros/friction/`, plus the smallest fix on a branch when the fix is clear, opened as a PR and never merged by the skill. One file per papercut keeps open papercut PRs from conflicting, and the retro reads unmerged papercut branches too.
 
-**The identity guard.** I publish my real harness, not a sanitised skeleton, because a setup used every day teaches better. The cost is that every commit of real configuration can leak a private name, so a guard keeps them out mechanically:
+**The identity guard.** I publish my real harness, not a sanitized skeleton, because a setup used every day teaches better. The cost is that every commit of real configuration can leak a private name, so a guard keeps them out mechanically:
 
 - A generator, private and never committed, builds a denylist of regexes from private sources: every file and directory name in my old private plugin tree, a list of private terms, and a small hand-kept file for what those two miss. It lives outside the repo, mode 0600, with a canary line so tests never type a real term.
 - `pre-commit` scans the staged diff and the committer email, `commit-msg` scans the message, and `pre-push` scans every pushed commit, tag and ref name. With the denylist missing, a push to a public or unknown remote is refused. Findings name a location and a denylist line number, never the matched text.
@@ -204,7 +191,7 @@ What the guard taught me:
 - **PR bodies skip git hooks.** `gh pr create` sends the body straight to GitHub, so the skills write it to a file and scan it with `guard/scan text` first.
 - **Transcripts carry your CLAUDE.md.** Before matching transcripts against the denylist, replace the home path with `~` and drop attachment records, which carry the injected user CLAUDE.md and any private terms in it.
 
-The last check stays human: the guard matches strings, and what counts as private is a judgment. Before this repo went public, I read a full-history scan, including PR titles and bodies.
+The last check stays human: the guard matches strings, and what counts as private is a judgment. So before a repo goes public, a person reads a full-history scan that also covers what `guard/scan --all` never sees: PR titles, bodies and comments, CI logs, and the `refs/pull/*` heads GitHub keeps after a squash merge, which go public with the repo.
 
 **One repo.** Groups of skills ship as extra plugins in the same marketplace, which are already enabled independently. I rejected a second marketplace from day one; the triggers for a split are privacy (a skill describing private infrastructure can't be published) or skill commits drowning harness commits.
 
@@ -217,7 +204,7 @@ A team harness fails the same way a personal one does, and every always-on token
 - **Distribution is a versioned team marketplace**, with plugins enabled per role (developer, QA, DevOps) and per project. Never reuse a marketplace name: adding a marketplace under a name that already exists silently replaces the old one. I reproduced that in an isolated config directory.
 - **Voice is a choice (opinion).** Don't force a style on a team. A forced style overrides everyone's pick while its plugin is enabled. Ship two or three styles people can choose from.
 
-The guard generalises: the same generated denylist works for customer names, internal codenames and secrets before anything leaves the company. And the reference ladder matters more for a team than for one person, because teams accumulate glossaries, board maps and directories.
+The guard generalizes: the same generated denylist works for customer names, internal codenames and secrets before anything leaves the company. And the reference ladder matters more for a team than for one person, because teams accumulate glossaries, board maps and directories.
 
 What loadout doesn't cover (**opinion**): role workflows such as QA test plans or DevOps runbooks, permissions policy for shared infrastructure, and onboarding. A team harness will need skills for these; the budgets decide how many it can afford.
 
@@ -225,13 +212,13 @@ What loadout doesn't cover (**opinion**): role workflows such as QA test plans o
 
 Every pass reversed something the previous one believed. Each reversal came from measuring the platform or reading the primary source, and each is a place where a reasonable-sounding belief would have shipped.
 
-1. **Summarising memory.** The first draft distilled session logs into summaries and archived the originals. The consolidation research reversed it; the evidence is one study on a non-coding benchmark, and the rejection stands because raw records are the cheaper, reversible choice.
-2. **The skill ceiling, twice.** I first said skill indexing was a non-problem, then that skills past about 40 were evicted. The binary shows a character budget, and over-budget skills stay listed without their description.
-3. **Why the style beats CLAUDE.md, twice.** First "CLAUDE.md gets buried mid-context", which the Context Rot study contradicts. Then "the style sits in the system prompt", which the proxy contradicts.
-4. **A retrieval directive in the style.** Proposed first in shouting caps, then in normal prose, then dropped: the system prompt already carries an auto-memory section. It became a measurement.
+1. **Summarizing memory.** The first draft distilled session logs into summaries and archived the originals. The consolidation research reversed it; the evidence is one study on a non-coding benchmark, and the rejection stands because raw records are the cheaper, reversible choice.
+2. **The skill ceiling, twice.** I first said skill indexing was a non-problem, then that skills past about 40 were evicted. The binary shows a character budget, and over-budget skills stay listed without their description. See section 5.
+3. **Why the style beats CLAUDE.md, twice.** First "CLAUDE.md gets buried mid-context", which the Context Rot study contradicts. Then "the style sits in the system prompt", which the proxy contradicts. See section 2.
+4. **A retrieval directive in the style.** Proposed first in shouting caps, then in normal prose, then dropped: the system prompt already carries an auto-memory section. It became a measurement. See section 7.
 5. **A schema claim.** No installed skill used `user-invocable` or `when_to_use`, so I concluded they were invalid fields. The binary lists both. Absence from installed files is weak evidence about a schema.
 6. **The floor.** `--tools ""` stripped 15,600 tokens of built-in tools from the floor; `--safe-mode` is the clean one. The same review called my community skills "never invoked"; the usage record showed five of thirteen used, one to eleven times each.
-7. **The custom reviewer.** A review cut my planned reviewer in favour of the built-in `/code-review`, under the rule not to rebuild first-party tools. My own review practice runs tests, the app and a visual check, which the built-in doesn't, and Anthropic's own [`code-review` plugin](https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-review/commands/code-review.md) says "Do not check build signal or attempt to build or typecheck the app." So `/loadout:code-review` runs checks first, then independent reviewers, then a verifier that drops findings under 80, the plugin's own cut: "Filter out any issues with a score less than 80."
+7. **The custom reviewer.** A review cut my planned reviewer in favor of the built-in `/code-review`, under the rule not to rebuild first-party tools. My own review practice runs tests, the app and a visual check, which the built-in doesn't, and Anthropic's own [`code-review` plugin](https://github.com/anthropics/claude-plugins-official/blob/main/plugins/code-review/commands/code-review.md) says "Do not check build signal or attempt to build or typecheck the app." So `/loadout:code-review` runs checks first, then independent reviewers, then a verifier that drops findings under 80, the plugin's own cut: "Filter out any issues with a score less than 80."
 8. **Most of the style's disagreement rules.** I treated sycophancy as the style's main job. With-and-without evals showed both models already correcting planted errors, holding recommendations and stating assumptions.
 9. **Skills the model should pick.** `code-verify` never fired once superpowers' injection was gone, and `code-review` lost to a bundled skill of the same name. Both became typed-only.
 10. **Whole-transcript skipping.** Scripts that read `~/.claude` skipped every transcript matching the denylist. My old setup put private names into ordinary sessions, so nothing was left to measure. Count-only scripts now withhold matching records and count the rest.
@@ -253,7 +240,7 @@ Measurements come first: every token count, timing and eval score here was produ
 | [arXiv 2606.20512](https://arxiv.org/abs/2606.20512), Shepard and Albrecht, 2026 | probe-tuned repository guidance resolved 33.0 percent of SWE-bench Verified tasks, against 28.3 and 25.5 |
 | [arXiv 2605.12978](https://arxiv.org/abs/2605.12978), Zhang et al., 2026 | repeated model consolidation can take memory below the no-memory baseline |
 | [arXiv 2606.04329](https://arxiv.org/abs/2606.04329), Dash et al., 2026 | agents that write and retrieve memory aggressively are more exploitable |
-| [arXiv 2602.23971](https://arxiv.org/abs/2602.23971), UK AI Security Institute, 2026 | statements draw 24 points more sycophancy than questions |
+| [arXiv 2602.23971](https://arxiv.org/abs/2602.23971), UK AI Security Institute, 2026 | non-questions draw 24 points more sycophancy than questions |
 | [Zheng et al., Findings of EMNLP 2024](https://aclanthology.org/2024.findings-emnlp.888/) | personas did not beat a no-persona control |
 | [Context Rot](https://www.trychroma.com/research/context-rot), Chroma, 2025 | no position effect across 11 needle positions on its needle-in-a-haystack task |
 | [Two ways to change Claude's personality](https://danhopwood.com/posts/two-ways-to-change-claudes-personality), Dan Hopwood, 2026-07-18 | the length rule; an output style for voice |

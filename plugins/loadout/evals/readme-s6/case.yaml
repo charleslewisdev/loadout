@@ -1,11 +1,12 @@
 # S6, the README test: a fresh session with only README.md answers four questions.
-# It tests the README, not the plugin, so both arms should pass and the delta is
-# expected to be about zero; the without arm is the stricter reading of "only the
-# README in context". Run with --scaffold.
+# It tests the README, not the plugin, so the delta is about zero by design; it
+# passes when every answer is complete. The without arm is the stricter reading of
+# "only the README in context". Facts are graded by regex, judgment by llm.
+# Run with --scaffold.
 schema_version: "1.1"
 name: readme-s6
 tags: [docs, s6]
-runs: 3
+runs: 5
 context:
   scaffold_script: fixture.sh
 execution:
@@ -23,9 +24,21 @@ graders:
   - name: each-layer
     type: llm
     criteria: "Judge only the answer to question 2. Pass if it gives a purpose for at least these five layers and each purpose matches: the output style (identity, audience or register: how the model talks), CLAUDE.md (rules for every project, or build and test commands and conventions for one repo), skills (procedures or domain knowledge, body loaded on use), hooks (guarantees that must always happen, run outside the model), and the statusline (information to glance at, zero tokens). Fail if a layer is missing or its purpose is wrong."
-  - name: add-a-skill
-    type: llm
-    criteria: "Judge only the answer to question 3. It passes if it covers four steps, in any wording and order: (1) create a SKILL.md file in a skill directory inside the plugin's skills folder (any concrete path such as plugins/loadout/skills/<name>/SKILL.md counts); (2) keep the description under 200 characters; (3) write an eval case (a case.yaml) and run it with scripts/eval, keeping the skill only if it beats the no-plugin baseline; (4) run scripts/check or open a pull request. Fail only if one of the four is absent."
+  # The four facts question 3 needs, checked by regex: an llm judge failed complete
+  # answers here in 9 of 18 runs.
+  - name: add-a-skill-skill-md
+    type: regex
+    pattern: 'skills/[^\s`]+/SKILL\.md'
+  - name: add-a-skill-description-limit
+    type: regex
+    pattern: '200 char'
+  - name: add-a-skill-eval
+    type: regex
+    pattern: 'scripts/eval'
+  - name: add-a-skill-check-or-pr
+    type: regex
+    flags: i
+    pattern: 'scripts/check|pull request|\bPR\b'
   - name: glossary
     type: llm
     criteria: "Judge only the answer to question 4. Pass if it puts the glossary in a data file (TSV or JSON) searched with grep or a small lookup script, with one pointer line in CLAUDE.md naming the file and the command, so nothing loads until a term is needed. Fail if it puts the glossary in CLAUDE.md, an @ import, or a skill body, or leaves out the pointer line."

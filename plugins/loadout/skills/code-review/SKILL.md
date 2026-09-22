@@ -20,7 +20,7 @@ When the change touches UI, start the app with the built-in `run` skill and look
 
 ## 2. Independent reviewers
 
-Start one subagent per reviewer below, all in parallel. Give each only its brief (the file under `reviewers/` in this skill's directory), the scope from stage 0, and the check results from stage 1. No reviewer sees another's work.
+Start one fresh subagent per reviewer below, all in parallel, never a fork: a fork inherits this conversation and the output style. Give each only its brief (the file under `reviewers/` in this skill's directory), the scope from stage 0, and the check results from stage 1. No reviewer sees another's work.
 
 Always:
 
