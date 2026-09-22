@@ -3,7 +3,7 @@ name: harness-retro
 description: "Runs the harness retro: friction, the author's corrections, unread memory, budgets and skill usage become proposed rules, skills and deletions in one pull request."
 disable-model-invocation: true
 argument-hint: "[--since yyyy-mm-dd]"
-allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git *), Bash(gh pr create *), Bash(gh pr view *), Bash(gh pr list *), Bash(scripts/*)
+allowed-tools: Bash(git status *), Bash(git switch *), Bash(git pull --ff-only *), Bash(git add *), Bash(git commit -m *), Bash(git log *), Bash(git diff *), Bash(git remote *), Bash(git push -u origin retro/*), Bash(gh pr create *), Bash(gh pr view *), Bash(gh pr list *), Bash(scripts/retro-evidence *), Bash(scripts/memory-reads *), Bash(scripts/budget), Bash(scripts/lint-budgets), Bash(scripts/hook-report *), Bash(scripts/check), Bash(guard/scan text *)
 ---
 
 # Harness retro
@@ -47,14 +47,14 @@ Write `retros/<yyyy-mm-dd>.md`:
 - the window, and what each evidence source reported, as numbers and short quotes, never transcript dumps
 - each proposal, most important first: what changes, where it lives, the evidence behind it with dates and counts, and its token cost
 - what was considered and left out, one line each
-- the memory changes proposed in step 6
+- how many memory changes step 6 proposes, per project, as counts only: the retro file goes into the repository, which may be public, and memory stays on the machine
 
 This file dates the retro for /loadout:harness-status.
 
 ## 5. Open the pull request
 
-Make the repository changes on the branch, commit following `loadout:git-pr`, run `scripts/check`, push, and open one pull request whose body lists the proposals and the feedback wanted. The guard's pre-push scan runs on the push; if it refuses, fix what it names. Never merge. With no remote, stop after the commit and say so.
+Make the repository changes on the branch, commit following `loadout:git-pr` (never with `--no-verify`), and run `scripts/check`. With no remote (`git remote` prints nothing), stop after the commit and say so. Otherwise push with `git push -u origin retro/<date>`, write the title and body to a file, run `guard/scan text <file>` on it and fix what it names, then open one pull request with `gh pr create --title ... --body-file <file>`, listing the proposals and the feedback wanted. The guard's pre-push scan runs on the push; if it refuses, fix what it names. Never merge. Finish by switching back to the branch the checkout started on.
 
 ## 6. Memory, only on the author's yes
 
-Auto-memory lives outside the repository, so it is not part of the pull request. List each proposed change in the session: the project, the index line or memory file, the change (trim, merge, delete or rewrite), and the evidence (unread for 90 days, contradicted, duplicated). Apply each one only after the author says yes to it. Keep every MEMORY.md under 100 lines, one line per memory under 150 characters.
+Auto-memory lives outside the repository, so it is not part of the pull request. List each proposed change in the session: the project, the index line or memory file, the change (trim, merge, delete or rewrite), and the evidence (unread for 90 days, contradicted, duplicated). Apply each one only after the author says yes to it; each write asks for permission, because the skill grants no file tools. Keep every MEMORY.md under 100 lines, one line per memory under 150 characters.

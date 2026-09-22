@@ -3,7 +3,7 @@ name: harness-papercut
 description: "Logs one harness annoyance and proposes the smallest fix as a pull request to the loadout repo; the retro reads the log. Typed only."
 disable-model-invocation: true
 argument-hint: <what annoyed you>
-allowed-tools: Bash(git *), Bash(gh pr create *), Bash(gh pr view *), Bash(scripts/*), Read, Write, Edit, Glob, Grep
+allowed-tools: Bash(git status *), Bash(git switch *), Bash(git pull --ff-only *), Bash(git add *), Bash(git commit -m *), Bash(git log *), Bash(git diff *), Bash(git remote *), Bash(git push -u origin papercut/*), Bash(gh pr create *), Bash(gh pr view *), Bash(scripts/lint-budgets), Bash(scripts/budget), Bash(scripts/retro-evidence *), Bash(guard/scan text *)
 ---
 
 # Log a papercut
@@ -23,4 +23,4 @@ Turn one specific annoyance into a logged line and, when the fix is clear, the s
    When no fix is clear, log the annoyance only; the retro decides.
 5. **Make the smallest fix,** then run `scripts/lint-budgets`, and `scripts/budget` for anything always on.
 6. **Log it** in a new file, `retros/friction/<yyyy-mm-dd>-<slug>.md`, holding one line: `YYYY-MM-DD <friction> -> <fix, or "logged"> (<file touched>)`. One file per papercut, so open papercut pull requests never conflict. If `scripts/retro-evidence` already lists the same friction, say so: the retro ranks repeated friction first.
-7. **Commit** the files you changed, staged by name (never `git add -A`), and **open a pull request** following `loadout:git-pr`, with the friction quoted in the description. Report the link, and never merge.
+7. **Commit** the files you changed, staged by name (never `git add -A`, never `--no-verify`). With no remote, stop after the commit and say so. Otherwise push with `git push -u origin papercut/<slug>`, write the title and body to a file, run `guard/scan text <file>` on it, and **open a pull request** with `gh pr create --body-file <file>` following `loadout:git-pr`, with the friction quoted. Report the link, never merge, and switch back to the branch the checkout started on.
