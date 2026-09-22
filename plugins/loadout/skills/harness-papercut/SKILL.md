@@ -3,7 +3,7 @@ name: harness-papercut
 description: "Logs one harness annoyance and proposes the smallest fix as a pull request to the loadout repo; the retro reads the log. Typed only."
 disable-model-invocation: true
 argument-hint: <what annoyed you>
-allowed-tools: Bash(git *), Bash(gh *), Read, Write, Edit, Glob, Grep
+allowed-tools: Bash(git *), Bash(gh pr create *), Bash(gh pr view *), Bash(scripts/*), Read, Write, Edit, Glob, Grep
 ---
 
 # Log a papercut
@@ -11,7 +11,7 @@ allowed-tools: Bash(git *), Bash(gh *), Read, Write, Edit, Glob, Grep
 Turn one specific annoyance into a logged line and, when the fix is clear, the smallest change that removes it. Every change traces to this friction; no general improvements.
 
 1. **Capture** the annoyance from the arguments. If there are none, ask for it in one or two sentences. Quote it word for word from here on.
-2. **Find the checkout:** `$LOADOUT_REPO`, or the current repository when its `.claude-plugin/marketplace.json` names `loadout`. If neither exists, stop and say to run `./install.sh workstation` in the checkout, which sets `LOADOUT_REPO`. If the working tree is not clean, ask before going on.
+2. **Find the checkout:** `$LOADOUT_REPO`, or the current repository when its `.claude-plugin/marketplace.json` names `loadout`. If neither exists, stop and say to run `./install.sh workstation` in the checkout, which sets `LOADOUT_REPO`. If `git status --short --untracked-files=no` shows changes to tracked files, ask before going on; untracked files stay out of the papercut.
 3. **Branch** `papercut/<short-slug>` from main.
 4. **Decide which layer owns the fix:**
    - something that must happen every time: a hook in `plugins/loadout/hooks/`, registered through `hook-timed`
@@ -22,5 +22,5 @@ Turn one specific annoyance into a logged line and, when the fix is clear, the s
 
    When no fix is clear, log the annoyance only; the retro decides.
 5. **Make the smallest fix,** then run `scripts/lint-budgets`, and `scripts/budget` for anything always on.
-6. **Log it:** append one line to `retros/friction.md`, creating it if needed: `YYYY-MM-DD <friction> -> <fix, or "logged"> (<file touched>)`. If the same friction is already in the log, say so: the retro ranks repeated friction first.
-7. **Commit and open a pull request** following `loadout:git-pr`, with the friction quoted in the description. Report the link, and never merge.
+6. **Log it** in a new file, `retros/friction/<yyyy-mm-dd>-<slug>.md`, holding one line: `YYYY-MM-DD <friction> -> <fix, or "logged"> (<file touched>)`. One file per papercut, so open papercut pull requests never conflict. If `scripts/retro-evidence` already lists the same friction, say so: the retro ranks repeated friction first.
+7. **Commit** the files you changed, staged by name (never `git add -A`), and **open a pull request** following `loadout:git-pr`, with the friction quoted in the description. Report the link, and never merge.

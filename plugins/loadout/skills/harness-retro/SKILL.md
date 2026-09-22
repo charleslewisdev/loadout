@@ -3,7 +3,7 @@ name: harness-retro
 description: "Runs the harness retro: friction, the author's corrections, unread memory, budgets and skill usage become proposed rules, skills and deletions in one pull request."
 disable-model-invocation: true
 argument-hint: "[--since yyyy-mm-dd]"
-allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git *), Bash(gh pr *), Bash(jq *), Bash(scripts/*)
+allowed-tools: Read, Grep, Glob, Edit, Write, Bash(git *), Bash(gh pr create *), Bash(gh pr view *), Bash(gh pr list *), Bash(scripts/*)
 ---
 
 # Harness retro
@@ -22,11 +22,10 @@ In the checkout, stop if `git status --short --untracked-files=no` shows changes
 
 The window starts at the last `retros/<yyyy-mm-dd>.md`, or 90 days back; `$ARGUMENTS` may give `--since yyyy-mm-dd`. Run each from the checkout and keep the output:
 
-- `retros/friction.md`: the papercuts logged since the last retro.
-- `scripts/retro-evidence`: the author's corrections and the prompts repeated across sessions. It reads interactive transcripts only and skips every project and every whole transcript that matches the denylist. Read transcripts only through it, never directly: they hold text the retro must not copy.
-- `scripts/memory-reads --unread 90`: memory files no session read in 90 days.
+- `scripts/retro-evidence`: the friction log (`retros/friction/`, on main and on papercut branches not yet merged), skill usage, the author's corrections and the prompts repeated across sessions. It reads interactive transcripts only and skips every project and every whole transcript that matches the denylist. Read transcripts, `~/.claude.json` and the friction log only through it, never directly: they can hold text the retro must not copy.
+- `scripts/memory-reads --unread 90`: memory files no session read in 90 days. It says how many days the transcripts actually cover; a file unread over a shorter span is weak evidence.
 - `scripts/budget` (about a minute), `scripts/lint-budgets`, `scripts/hook-report 90`.
-- Skill usage: `jq '.skillUsage' ~/.claude.json`. A loadout skill unused for 90 days is a deletion candidate, and so is one that corrections keep overriding.
+- In the skill usage it reports, a loadout skill unused for 90 days is a deletion candidate, and so is one that corrections keep overriding.
 
 If a script fails, record which one and why, and go on without it.
 
