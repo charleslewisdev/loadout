@@ -108,8 +108,10 @@ done
   for f in "$root"/retros/friction/*.md "$root"/retros/friction.md; do
     [[ -f $f ]] && sed 's/^/- /' "$f"
   done
+  base=main
+  git -C "$root" rev-parse --verify -q main >/dev/null 2>&1 || base=origin/main
   for ref in $(git -C "$root" for-each-ref --format='%(refname:short)' refs/heads/papercut refs/remotes/origin/papercut 2>/dev/null); do
-    { git -C "$root" diff --no-color main..."$ref" -- retros/friction retros/friction.md 2>/dev/null || true; } |
+    { git -C "$root" diff --no-color "$base"..."$ref" -- retros/friction retros/friction.md 2>/dev/null || true; } |
       awk -v ref="$ref" '/^\+[0-9][0-9][0-9][0-9]-/ { print "- " substr($0, 2) " (open branch " ref ")" }'
   done
   echo

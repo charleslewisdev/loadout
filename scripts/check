@@ -78,12 +78,15 @@ retro_evidence_test() {
     printf '{"type":"user","uuid":"%s","sessionId":"%s","timestamp":"%s","entrypoint":"cli","message":{"role":"user","content":%s}}\n' \
       "$RANDOM$RANDOM" "$RANDOM" "$ts" "$c" >"$t/cfg/projects/-w-app/$RANDOM.jsonl"
   done
-  git clone -q "$root" "$t/repo" 2>/dev/null
-  git -C "$t/repo" switch -q -c papercut/check-test
-  mkdir -p "$t/repo/retros/friction"
+  # A throwaway repository holding only this script, a main and one papercut branch.
+  mkdir -p "$t/repo/scripts" "$t/repo/retros/friction"
+  cp "$root/scripts/retro-evidence" "$t/repo/scripts/"
+  local g=(git -C "$t/repo" -c user.name=t -c user.email=test@localhost -c core.hooksPath=/dev/null)
+  "${g[@]}" init -q -b main && "${g[@]}" add scripts && "${g[@]}" commit -q -m "chore: start"
+  "${g[@]}" switch -q -c papercut/check-test
   echo "2026-01-02 a check friction -> logged (none)" >"$t/repo/retros/friction/2026-01-02-check.md"
-  git -C "$t/repo" add retros && git -C "$t/repo" -c user.name=t -c user.email=test@localhost commit -q --no-verify -m "test: papercut"
-  git -C "$t/repo" switch -q main 2>/dev/null || git -C "$t/repo" switch -q -c main
+  "${g[@]}" add retros && "${g[@]}" commit -q -m "test: papercut"
+  "${g[@]}" switch -q main
   out=$(HOME=$t CLAUDE_CONFIG_DIR=$t/cfg GUARD_DENYLIST=$t/deny "$t/repo/scripts/retro-evidence" --since 2026-01-01) || rc=$?
   rm -rf "$t"
   ((rc == 0)) || { echo "retro-evidence exited $rc"; return 1; }
