@@ -30,5 +30,5 @@ graders:
     input_match: 'git commit'
   - name: evidence-and-ranking
     type: llm
-    focus: last_message
-    criteria: "The reply shows the retro file the run wrote. Pass only if each proposal in it cites its evidence (friction log entries with their dates, counts, or numbers from the scripts), and the formatter friction, which the friction log records twice and a correction repeats, is ranked as the first or most important proposal. Fail if no retro file is shown, if proposals carry no evidence, or if another item is ranked above the formatter friction."
+    focus: trace
+    criteria: "Find the Write call in the trace that creates retros/<date>.md and judge the content it writes. Pass only if each proposal in it cites its evidence (friction log entries with their dates, counts, or numbers from the scripts), and the formatter friction, which the friction log records twice and a correction repeats, is ranked as the first or most important proposal. Fail if no retro file is written, if proposals carry no evidence, or if another item is ranked above the formatter friction."
