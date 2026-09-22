@@ -2,8 +2,8 @@
   "extraKnownMarketplaces": {
     "loadout": {
       "source": {
-        "source": "git",
-        "url": "https://github.com/charleslewisdev/loadout.git",
+        "source": "github",
+        "repo": "charleslewisdev/loadout",
         "ref": "main"
       }
     }
