@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # How often sessions read their auto-memory (success criterion S4).
 #
-#   scripts/memory-reads [days]     default 14
+#   scripts/memory-reads [days]            default 14
+#   scripts/memory-reads --unread <days>   memory files no session read in <days>
 #
 # Counts Read and Grep calls into any auto-memory directory
 # (~/.claude/projects/<project>/memory/) per session, from the transcripts
@@ -16,9 +17,20 @@
 # Before matching, the home path is replaced by ~, and attachment records are
 # dropped: they hold the injected user CLAUDE.md, which names the private
 # vocabulary in every session.
+#
+# --unread lists, per project, the memory files (not MEMORY.md) that no
+# interactive session read with Read or Grep in the window: the retro's candidates
+# for trimming an index. Project and file names that match the denylist are
+# withheld.
 set -euo pipefail
 
+unread=0
+if [[ ${1:-} == --unread ]]; then
+  unread=1
+  shift
+fi
 days=${1:-14}
+[[ $days =~ ^[0-9]+$ ]] || { echo "usage: scripts/memory-reads [--unread] [days]" >&2; exit 2; }
 deny="${GUARD_DENYLIST:-$HOME/.config/loadout-guard/denylist}"
 projects="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
 if [[ ! -r $deny ]]; then
@@ -40,6 +52,7 @@ fi
 memory_re="$(sed 's/[][\.*^$()+?{}|]/\\&/g' <<<"${projects/#"$HOME"/\~}")/[^/]+/memory(/|\$)"
 scanned=0 skipped=0 printmode=0 withheld=0 partial=0 with_reads=0 reads=0
 : >"$tmp/per-session"
+: >"$tmp/read-paths"
 for dir in "$projects"/*/; do
   name=$(basename "$dir")
   if grep -q -i -E -f "$tmp/deny" <<<"${name//"$enc"/\~}"; then
@@ -63,10 +76,12 @@ for dir in "$projects"/*/; do
       partial=$((partial + 1))
     fi
     scanned=$((scanned + 1))
-    n=$(jq -r 'select(.type == "assistant") | .message.content[]?
+    jq -r 'select(.type == "assistant") | .message.content[]?
           | select(.type == "tool_use" and (.name == "Read" or .name == "Grep"))
           | .input.file_path // .input.path // empty' "$tmp/conversation" 2>/dev/null |
-      grep -c -E "$memory_re" || true)
+      { grep -E "$memory_re" || true; } >"$tmp/session-paths"
+    cat "$tmp/session-paths" >>"$tmp/read-paths"
+    n=$(wc -l <"$tmp/session-paths")
     echo "$n" >>"$tmp/per-session"
     if ((n > 0)); then
       with_reads=$((with_reads + 1))
@@ -74,6 +89,29 @@ for dir in "$projects"/*/; do
     fi
   done < <(find "$dir" -maxdepth 1 -name '*.jsonl' -mtime "-$days")
 done
+
+if ((unread)); then
+  withhold() { if grep -q -i -E -f "$tmp/deny" <<<"$1"; then printf '(name withheld)'; else printf '%s' "$1"; fi; }
+  echo "Auto-memory files not read by an interactive session in the last $days days, $(date +%F)"
+  echo "  (from $scanned sessions; Read or Grep of the file itself counts as a read)"
+  for dir in "$projects"/*/; do
+    [[ -d ${dir}memory ]] || continue
+    name=$(basename "$dir")
+    name=${name//"$enc"/\~}
+    grep -q -i -E -f "$tmp/deny" <<<"$name" && continue
+    files=() missing=()
+    for f in "${dir}"memory/*.md; do
+      [[ -f $f && $(basename "$f") != MEMORY.md ]] || continue
+      files+=("$f")
+      key=$(sed -e "s|$HOME|~|g" -e "s|$enc|~|g" <<<"$f")
+      grep -q -x -F -e "$key" "$tmp/read-paths" || missing+=("$(basename "$f")")
+    done
+    ((${#files[@]})) || continue
+    echo "  $(withhold "$name"): ${#missing[@]} of ${#files[@]} files unread"
+    for m in "${missing[@]}"; do echo "    $(withhold "$m")"; done
+  done
+  exit 0
+fi
 
 mkdir -p "${LOADOUT_CACHE:-$HOME/.cache/loadout}"
 exec > >(tee "${LOADOUT_CACHE:-$HOME/.cache/loadout}/memory-reads")
