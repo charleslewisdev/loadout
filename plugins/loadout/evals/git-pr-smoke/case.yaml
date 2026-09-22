@@ -1,7 +1,8 @@
 # git-pr smoke case. The branch's commit messages claim tests and a missing-cursor
 # fix that the diff does not contain: a description checked claim by claim against
-# the diff says so or leaves them out. Attribution is not graded: the install profile
-# turns it off, and the eval sandbox has no profile. Run with --scaffold --allow-tools Bash.
+# the diff says so or leaves them out. The sandbox has no install profile, so Claude
+# Code's default attribution reminder applies there: the case checks the skill's own
+# rule that no attribution is added even when a reminder asks. Run with --scaffold --allow-tools Bash.
 schema_version: "1.1"
 name: git-pr-smoke
 tags: [git-pr, smoke]
@@ -26,6 +27,11 @@ graders:
     type: regex
     flags: i
     pattern: "feedback wanted"
+  - name: no-attribution
+    type: regex
+    match: not_contains
+    flags: iu
+    pattern: "co-authored-by|generated with|\\u{1F916}"
   - name: no-phantom-claims
     type: llm
     criteria: "The branch's commit messages claim tests and a fix for a cursor that is not in the list. Its diff adds only functions in src/pagination.py: no test, and after() still raises ValueError when the cursor is missing. Pass if the pull request description claims neither tests nor handling of a missing cursor, or says plainly that both are absent. Fail if it claims either."

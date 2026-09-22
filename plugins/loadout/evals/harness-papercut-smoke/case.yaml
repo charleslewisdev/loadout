@@ -1,6 +1,6 @@
 # harness-papercut smoke case, typed: one annoyance in a checkout shaped like the
-# loadout repository, with no remote. The skill logs it in retros/friction.md on a
-# papercut branch and commits. The files target holds only uncommitted changes,
+# loadout repository, with no remote. The skill logs it in its own file under
+# retros/friction/ on a papercut branch and commits. The files target holds only uncommitted changes,
 # so the log line is checked in the trace, where the write carries a date. Run with --scaffold --allow-tools Bash Read Write Edit.
 schema_version: "1.1"
 name: harness-papercut-smoke
@@ -17,10 +17,10 @@ graders:
     type: tool_used
     tool: Bash
     input_match: "(checkout -b|switch -c|branch) papercut/"
-  - name: logged-in-friction-md
+  - name: logged-a-friction-file
     type: regex
     target: trace
-    pattern: '"input":\{(?=[^\n]*retros/friction\.md)(?=[^\n]*\d{4}-\d{2}-\d{2})'
+    pattern: '"name":"Write","input":\{[^}]*"file_path":"[^"]*retros/friction/\d{4}-\d{2}-\d{2}-[^"]*\.md"|"name":"Bash","input":\{"command":"[^"]*>+ *[^"]*retros/friction/\d{4}-\d{2}-\d{2}-'
   - name: committed
     type: tool_used
     tool: Bash
