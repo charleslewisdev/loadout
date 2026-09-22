@@ -6,6 +6,7 @@
 # Backs up settings.json to ~/.claude/backups/, then deep-merges
 # profiles/<profile>.json over it with `jq -s '.[0] * .[1]'`: profile keys win and
 # every other key is kept. "$HOME" in a profile string becomes this machine's home.
+# It also sets LOADOUT_REPO to this checkout, where the harness skills open PRs.
 # A second run leaves settings.json byte-identical. Unless --no-register, it adds
 # the loadout marketplace (again, when its ref changed) and installs or updates the plugin.
 # --ref tracks another branch than the profile's, to run an unmerged branch.
@@ -37,9 +38,10 @@ mkdir -p "$HOME/.claude/backups"
 [[ -f $settings ]] || echo '{}' >"$settings"
 cp -p "$settings" "$(mktemp "$HOME/.claude/backups/settings.json.$(date +%Y%m%dT%H%M%S).XXXX")"
 
-wanted=$(jq --arg home "$HOME" --arg ref "$ref" '
+wanted=$(jq --arg home "$HOME" --arg ref "$ref" --arg repo "$here" '
   walk(if type == "string" then gsub("\\$HOME"; $home) else . end)
-  | if $ref != "" then .extraKnownMarketplaces.loadout.source.ref = $ref else . end' "$src")
+  | if $ref != "" then .extraKnownMarketplaces.loadout.source.ref = $ref else . end
+  | .env.LOADOUT_REPO = $repo' "$src")
 merged=$(jq -s '.[0] * .[1]' "$settings" - <<<"$wanted")
 if [[ $merged != "$(cat "$settings")" ]]; then
   printf '%s\n' "$merged" >"$settings"
