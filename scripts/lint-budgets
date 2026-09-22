@@ -58,7 +58,8 @@ while IFS= read -r f; do
   total=$((total + n))
   if ((n > 200)); then fail "$(rel "$f"): description and when_to_use $n characters, ceiling 200"; fi
 done < <(find "$root" -path '*/.git' -prune -o -path '*/skills/*/SKILL.md' -type f -print | sort)
-if ((total > 5000)); then fail "all skill descriptions together: $total characters, ceiling 5000"; fi
+if ((total > 5000)); then fail "all skill descriptions together: $total characters, ceiling 5000"
+elif ((total > 4000)); then warn "all skill descriptions together: $total characters, target 4000"; fi
 
 wrapper='^"?\$\{CLAUDE_PLUGIN_ROOT\}/scripts/hook-timed"? '
 lint_hooks() {  # file, jq path to the hooks object

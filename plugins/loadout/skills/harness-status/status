@@ -40,8 +40,7 @@ if [[ -r $b ]]; then
   echo "Harness share $range tokens against a $(commas "$(field ceiling "$b")") ceiling: $(field result "$b"), measured $(age "$b") on Claude Code $(field claude_version "$b")."
   echo "Vendor floor $(commas "$(lo floor "$b")"); auto-memory section up to $(commas "$(hi automemory "$b")"); MCP servers up to $(commas "$(hi mcp "$b")")."
   if [[ -n $(field listing_chars "$b") ]]; then
-    echo "Skill listing: $(field listing_skills "$b") skills, $(commas "$(field listing_chars "$b")") characters against a budget of $(commas "$(field listing_budget "$b")"), so descriptions are cut."
-    hints+=("The skill listing is over its budget on the smallest model, a retro trigger: /loadout:harness-retro reviews unused skills.")
+    echo "Skill listing: $(field listing_skills "$b") skills, $(commas "$(field listing_chars "$b")") characters against a budget of $(commas "$(field listing_budget "$b")"), so descriptions are cut. Most of it is bundled and account-synced skills, which the harness does not control."
   fi
   [[ $(field result "$b") == pass ]] || hints+=("The harness share is over its ceiling: find the new cost with scripts/budget and cut it before adding anything.")
   e=$(field epoch "$b")
@@ -49,6 +48,18 @@ if [[ -r $b ]]; then
 else
   echo "Not measured on this machine."
   hints+=("Measure the turn-0 cost: /loadout:harness-status --measure (about a minute).")
+fi
+
+# The retro's listing trigger counts only what the harness controls: its own
+# descriptions. The whole listing overflows on bundled and account-synced skills
+# alone, so a trigger on that fires for ever. The warning is 4,000 characters, below
+# the 5,000 ceiling that scripts/lint-budgets fails a push on, so the retro hears
+# about it first. The file set matches the lint's.
+if [[ -x $repo/scripts/desc-chars ]]; then
+  own=$(find "$repo" -path '*/.git' -prune -o -path '*/skills/*/SKILL.md' -type f -print |
+    sort | xargs "$repo/scripts/desc-chars" | awk '{ t += $1 } END { print t + 0 }')
+  echo "Harness skill descriptions: $(commas "$own") characters, warning at 4,000, ceiling 5,000."
+  ((own > 4000)) && hints+=("The harness's own skill descriptions are near their ceiling, a retro trigger: /loadout:harness-retro reviews them.")
 fi
 
 echo

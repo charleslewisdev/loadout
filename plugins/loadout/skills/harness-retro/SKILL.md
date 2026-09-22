@@ -8,7 +8,7 @@ allowed-tools: Bash(git status *), Bash(git switch *), Bash(git pull --ff-only *
 
 # Harness retro
 
-The retro turns evidence into a handful of changes, proposed in one pull request the author reviews. It runs every 90 days at the latest, and earlier when /loadout:harness-status names a trigger: the skill listing over budget on the smallest model, a MEMORY.md over 100 lines, or a SKILL.md over 500 lines.
+The retro turns evidence into a handful of changes, proposed in one pull request the author reviews. It runs every 90 days at the latest, and earlier when /loadout:harness-status names a trigger: the harness's own skill descriptions past 4,000 characters, near their 5,000 ceiling, a MEMORY.md over 100 lines, or a SKILL.md over 500 lines.
 
 Nothing reaches memory, rules or skills until the author merges or says yes. Never print, quote or copy anything that matches the identity guard's denylist, and never write a home path; use `~`.
 
