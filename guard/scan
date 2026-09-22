@@ -7,6 +7,8 @@
 #   guard/scan msg <file>    a commit message without git's comments, or ref names
 #   guard/scan text <file>   any text headed for GitHub, whole: a PR title or body
 #   guard/scan tag <object>  an annotated tag: its name, message and tagger email
+#   guard/scan --path <dir>  every file under a directory, read as bytes, and every name;
+#                            archives are counted, not opened; UTF-16 is not decoded
 #
 # Three checks: the private denylist (never in this repo), secret patterns, and
 # emails against guard/allowed-emails, where "committer-only <email>" admits an
@@ -20,11 +22,25 @@
 # GUARD_REQUIRE_DENYLIST=1  a missing denylist is a finding, not a skipped check
 set -euo pipefail
 
-root=$(git rev-parse --show-toplevel)
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$(cd "$(dirname "$0")/.." && pwd)
 allowed="$root/guard/allowed-emails"
 deny="${GUARD_DENYLIST:-$HOME/.config/loadout-guard/denylist}"
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+# A signal stops the children too: the long --path steps run under wait.
+kill_tree() {  # pid: the process and every descendant
+  local c kids
+  kids=$(pgrep -P "$1" 2>/dev/null) || true
+  for c in $kids; do kill_tree "$c"; done
+  kill "$1" 2>/dev/null || true
+}
+cleanup() {
+  local c kids
+  kids=$(pgrep -P $$ 2>/dev/null) || true
+  for c in $kids; do kill_tree "$c"; done
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
 findings="$tmp/findings"
 : >"$findings"
 
@@ -185,6 +201,92 @@ case "${1:-}" in
     [[ -r ${2:-} ]] || { echo "usage: guard/scan text <file>" >&2; exit 2; }
     { printf '\001COMMIT text\n'; cat "$2"; printf '\n\001ENDMSG\n'; } | records
     check_records
+    ;;
+  --path)
+    [[ -d ${2:-} ]] || { echo "usage: guard/scan --path <dir>" >&2; exit 2; }
+    [[ -s $tmp/deny ]] || { echo "guard: --path needs the denylist" >&2; exit 2; }
+    dir=$(cd "$2" && pwd)
+    # Loose forms select candidates: no word boundaries, and a space outside a bracket
+    # reads as an optional space or underscore, so a term inside snake_case or
+    # camelCase still selects its file. The exact check below decides.
+    perl -pe 's/\\b//g; s/(\[[^]]*\])| /defined $1 ? $1 : "[ _]?"/ge' "$tmp/deny" >"$tmp/loose"
+    rc=0
+    grep -E -f "$tmp/loose" /dev/null || rc=$?
+    ((rc < 2)) || { echo "guard: a loose form of the denylist does not compile" >&2; exit 2; }
+    # One walk on one filesystem, NUL-separated: every name, and the regular files
+    # whose content is read. The long steps run under wait, so a signal stops them.
+    find -H "$dir" -xdev -print0 >"$tmp/names" 2>"$tmp/walk-errors" &
+    wait $! || true
+    { perl -0ne 'chomp; print "$_\0" if -f $_ && !-l $_' "$tmp/names" |
+        xargs -0 -r grep -l -Z -a -i -E -f "$tmp/loose" -- >"$tmp/candidates" 2>"$tmp/grep-errors"; } &
+    rc=0
+    wait $! || rc=$?
+    # xargs exits 123 when a grep found nothing or could not read a file; the error
+    # lines say which. Anything else means the prefilter stopped partway.
+    ((rc == 0 || rc == 123)) || { echo "guard: the content prefilter stopped (status $rc)" >&2; exit 2; }
+    cat "$tmp/walk-errors" "$tmp/grep-errors" >"$tmp/errors"
+    # The exact check, raw and normalized, on each candidate in 1 MiB chunks that
+    # overlap by 4 KiB, and on each path component. A chunk or component is checked
+    # only when the loose forms match it. This machine's home path reads as ~ first,
+    # as in the scripts that read transcripts, and so does Claude Code's dash-encoded
+    # form of it, which names every directory under ~/.claude/projects; without that,
+    # the username on the denylist would match every file that records a path. A
+    # component that matches is withheld, and tabs and newlines in names print as ?.
+    cat >"$tmp/exact.pl" <<'PERL'
+use strict; use warnings;
+my ($deny, $loose, $cand, $names, $errs) = @ARGV;
+my (@pat, @gate); my $n = 0;
+open my $d, "<", $deny or die "guard: cannot read the denylist\n";
+while (<$d>) { chomp; $n++; next if /^\s*$/; push @pat, [$n, qr/$_/i] }
+open my $l, "<", $loose or die; while (<$l>) { chomp; push @gate, "(?:$_)" if /\S/ }
+my $gate = join "|", @gate; $gate = qr/$gate/i;
+(my $home = $ENV{HOME}) =~ s{/+$}{};
+(my $dashed = $home) =~ s{/}{-}g;
+sub norm { my $s = shift; $s =~ s/_/ /g; $s =~ s/([a-z0-9])([A-Z])/$1 $2/g; $s }
+# The overlap is taken after this rewrite, so it can never cut a home path in two.
+sub unhome { my $s = shift; $s =~ s/\Q$home\E(?![\w-])/~/g; $s =~ s/\Q$dashed\E(?!\w)/~/g; $s }
+sub hits { my ($s, $seen) = @_;
+  $s = unhome($s);
+  my $t = norm($s);
+  for my $p (@pat) { $seen->{$p->[0]} = 1 if $s =~ $p->[1] || $t =~ $p->[1] } }
+sub rel { my $p = shift; $p =~ s/^\Q$home\E(?![\w-])/~/; $p }
+sub shown { my @o;
+  for my $c (split m{/}, rel(shift), -1) { my %h; hits($c, \%h); if (%h) { push @o, "(withheld)"; last } push @o, $c }
+  my $s = join "/", @o; $s =~ s/[\t\n\r]/?/g; $s }
+sub out { print join("\t", @_), "\n" }
+sub lines { join ",", sort { $a <=> $b } keys %{ $_[0] } }
+my @unread;
+{ local $/ = "\0"; open my $c, "<", $cand or die;
+  while (my $f = <$c>) { chomp $f; my %h; my $tail = "";
+    open my $fh, "<:raw", $f or do { push @unread, $f; next };
+    while (1) { my $got = read($fh, my $buf, 1 << 20);
+      if (!defined $got) { push @unread, $f; last }
+      last if $got == 0;
+      my $s = unhome($tail . $buf); hits($s, \%h) if $s =~ $gate;
+      $tail = length($s) > 4096 ? substr($s, -4096) : $s }
+    close $fh;
+    out("content", shown($f), lines(\%h)) if %h } }
+{ local $/ = "\0"; open my $nm, "<", $names or die; my %done;
+  while (my $f = <$nm>) { chomp $f; my @c = split m{/}, rel($f), -1;
+    for my $i (0 .. $#c) { next unless $c[$i] =~ $gate; my %h; hits($c[$i], \%h); next unless %h;
+      my $key = join "/", @c[0 .. $i]; last if $done{$key}++;
+      out("name", shown($key), lines(\%h)); last } } }
+open my $e, "<", $errs or die;
+while (<$e>) { chomp; push @unread, /^(?:grep|find): (?:\xe2\x80\x98|')?(.+?)(?:\xe2\x80\x99|')?: [^:]+$/ ? $1 : "(a path the error does not name)" }
+out("unread", shown($_)) for @unread;
+PERL
+    perl "$tmp/exact.pl" "$deny" "$tmp/loose" "$tmp/candidates" "$tmp/names" "$tmp/errors" >"$tmp/path-hits" &
+    wait $! || { echo "guard: the exact check failed" >&2; exit 2; }
+    unread=0
+    while IFS=$'\t' read -r kind where lines; do
+      case $kind in
+        name) finding "denylist line(s) $lines match the name at $where" ;;
+        content) finding "denylist line(s) $lines match inside $where" ;;
+        unread) finding "could not read $where, so its content is unchecked"; unread=$((unread + 1)) ;;
+      esac
+    done <"$tmp/path-hits"
+    archives=$(perl -0ne 'chomp; $n++ if /\.(gz|tgz|zip|xz|bz2|zst|7z|jar|whl|docx|xlsx|pptx|odt)\z/i; END { print $n + 0 }' "$tmp/names")
+    echo "guard: --path read $(tr -cd '\0' <"$tmp/names" | wc -c) names and $(tr -cd '\0' <"$tmp/candidates" | wc -c) candidate files; $unread paths could not be read; $archives archives and compressed documents were not opened, and UTF-16 text is not decoded" >&2
     ;;
   tag)
     [[ $(git cat-file -t "${2:-}" 2>/dev/null) == tag ]] || { echo "usage: guard/scan tag <tag object>" >&2; exit 2; }

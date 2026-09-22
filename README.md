@@ -41,19 +41,19 @@ claude -p "Reply with exactly the word OK and nothing else." --model haiku --out
 
 `scripts/budget` runs it in four configurations in an empty directory, three times each, and subtracts. Haiku is the measuring model because it has the smallest window in regular use, so truncation shows there first.
 
-| Configuration | Added to the command | Before loadout | With loadout |
+| Configuration | Added to the command | Before loadout | Legacy removed, 2026-09-21 |
 | --- | --- | --- | --- |
-| As configured | nothing | 25,288 to 25,843 | 23,933 |
-| Auto-memory off | `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` | 22,333 | 20,982 |
-| Vendor floor | `--safe-mode` | 17,859 | 17,714 |
-| **Harness share** | auto-memory off minus the floor | **4,474** | **3,268** |
+| As configured | nothing | 25,288 to 25,843 | 23,944 |
+| Auto-memory off | `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` | 22,333 | 20,995 |
+| Vendor floor | `--safe-mode` | 17,859 | 17,712 |
+| **Harness share** | auto-memory off minus the floor | **4,474** | **3,283** |
 
-The floor is Claude Code's own system prompt, built-in tools and bundled skills. The auto-memory section (about 2,950 tokens) is vendor text I keep on by choice, so it has its own line outside the ceiling. A fourth run, with an empty strict MCP config, shows that 1,514 of the 3,268 are the claude.ai connectors. The ceiling is 6,000 and the target after the last phase is about 3,000.
+The floor is Claude Code's own system prompt, built-in tools and bundled skills. The auto-memory section (about 2,950 tokens) is vendor text I keep on by choice, so it has its own line outside the ceiling. A fourth run, with an empty strict MCP config, shows that 1,514 of the 3,283 are the claude.ai connectors. The ceiling is 6,000 and the target is about 3,000.
 
 Four things I learned about reading the number:
 
-- **Runs disagree.** Before loadout, runs varied by up to 827 tokens: a legacy hook's health check and two local MCP servers sometimes finished before the first request. Now the claude.ai connectors race it, and the share swings between 1,754 and 3,268. So the script checks the ceiling against the highest of three runs.
-- **The skill listing overflows.** On Haiku, 48 skills put 21,698 characters into a listing budgeted at 8,000, so most descriptions get cut. loadout's five model-invoked skills are 860 of those characters; the rest are bundled skills, account-synced skills and a legacy plugin I'm removing.
+- **Runs disagree.** Before loadout, runs varied by up to 827 tokens: a legacy hook's health check and two local MCP servers sometimes finished before the first request. Now the claude.ai connectors race it: one set of three runs gave 1,754 to 3,268. So the script checks the ceiling against the highest of three runs.
+- **The skill listing overflows.** On Haiku, 34 skills put 17,981 characters into a listing budgeted at 8,000, so most descriptions get cut. loadout's five model-invoked skills are 860 of those characters; most of the rest are bundled and account-synced skills. Past the budget, descriptions are cut to fit, so removing skills saves little: taking out 14 cut 3,717 characters of descriptions, and the share rose by 15 tokens.
 - **`claude plugin details` under-reports.** It counts neither the output style nor anything a session-start hook prints. Before loadout had skills, it showed about 0 always-on tokens while the style was already loading in every session.
 - **A logging proxy is wrong for totals.** With `ANTHROPIC_BASE_URL` set, deferred tool loading switches off, and the same prompt cost 79,181 tokens against 25,378 without it. Use a proxy to see structure, never to count.
 
@@ -87,7 +87,7 @@ Every always-on surface has a target and a ceiling. `scripts/budget` measures th
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
-| Harness share | about 3,000 tokens | 6,000 tokens | 3,268 | about 3 percent of a 200k window above the vendor floor |
+| Harness share | about 3,000 tokens | 6,000 tokens | 3,283 | about 3 percent of a 200k window above the vendor floor |
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 506 tokens | Anthropic's built-in styles run 250 to 370 tokens, more when they carry examples |
 | User CLAUDE.md | about 30 lines | 200 lines | 41 lines (warning) | the docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | about 80 lines | 200 lines | template under 20 | build, test, conventions that differ, pitfalls |

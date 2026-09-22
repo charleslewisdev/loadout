@@ -10,7 +10,7 @@
 #      guard/allowed-emails, no secret patterns, and the private denylist where
 #      it exists (never in CI)
 #   4. plugin, marketplace and skill names against guard/forbidden-names
-#   5. the statusline tests
+#   5. the statusline tests, and guard/scan --path and retro-evidence on synthetic homes
 #   6. locally only: claude plugin validate .
 set -uo pipefail
 
@@ -95,12 +95,76 @@ retro_evidence_test() {
   if grep -q -i 'zorblax' <<<"$out"; then echo "a withheld term was printed"; return 1; fi
 }
 
+# guard/scan --path on synthetic trees. It must find a term raw, in snake_case, in
+# camelCase and inside a binary file; a two-word term in the generator's bracket
+# shape, spaced, joined and in camelCase; a term that starts where the home path's
+# name would continue; a matching file name, directory name and a name under a
+# symlinked directory; an unreadable file, reported as unchecked; and a name with a
+# newline, printed as ?. It must number lines as the denylist does, blank lines
+# included; pass the home path and its dash-encoded form; exit 0 on a clean tree;
+# and run outside a git checkout.
+path_scan_test() {
+  local t h d out rout lout cout rc=0 lrc=0 crc=0 f scan
+  scan=$root/guard/scan
+  t=$(mktemp -d)
+  h=$t/home-zorblax
+  d=$(tr / - <<<"$h")
+  mkdir -p "$h/tree/zorblax-notes" "$h/clean"
+  printf '\n\\bzorblax\\b\nquux frob\nzorblaxian\n\\bwib[ ._-]?wob\\b\n' >"$t/deny"
+  echo nothing >"$h/tree/clean.txt"
+  echo "the zorblax plan" >"$h/tree/raw.txt"
+  echo "see project_zorblax notes" >"$h/tree/snake.md"
+  echo "new ZorblaxClient()" >"$h/tree/camel.ts"
+  printf 'a\0zorblax\0b' >"$h/tree/binary.db"
+  echo "new QuuxFrob()" >"$h/tree/twoword.ts"
+  echo "the wib wob plan" >"$h/tree/bracket-spaced.txt"
+  echo "new WibWob()" >"$h/tree/bracket-camel.ts"
+  echo "see ${h}ian/notes" >"$h/tree/prefix.txt"
+  echo fine >"$h/tree/zorblax-notes/inner.txt"
+  echo fine >"$h/tree/zorblax.txt"
+  echo "path $h/x, $h. and $d-code-x/y, $d/z" >"$h/tree/home.txt"
+  echo zorblax >"$h/tree/$(printf 'new\nline.txt')"
+  echo zorblax >"$h/tree/locked.txt" && chmod 000 "$h/tree/locked.txt"
+  mkdir -p "$t/elsewhere/zorblax-dir" && ln -s "$t/elsewhere" "$h/tree/link"
+  echo fine | gzip >"$h/tree/notes.gz"
+  echo "path $h/code" >"$h/clean/a.txt"
+  HP=$h perl -e 'print "xxxx $ENV{HP}/code/file\n" x 150000' >"$h/clean/big.log"
+  out=$(cd "$t" && HOME=$h GUARD_DENYLIST=$t/deny "$scan" --path "$h/tree" 2>&1) || rc=$?
+  rout=$(cd "$h" && HOME=$h GUARD_DENYLIST=$t/deny "$scan" --path tree 2>&1) || true
+  lout=$(cd "$t" && HOME=$h GUARD_DENYLIST=$t/deny "$scan" --path "$h/tree/link" 2>&1) || lrc=$?
+  cout=$(cd "$t" && HOME=$h GUARD_DENYLIST=$t/deny "$scan" --path "$h/clean" 2>&1) || crc=$?
+  chmod 600 "$h/tree/locked.txt"
+  rm -rf "$t"
+  ((rc == 1)) || { echo "guard/scan --path exited $rc"; return 1; }
+  for f in raw.txt snake.md camel.ts binary.db; do
+    grep -q "line(s) 2 match inside ~/tree/$f" <<<"$out" || { echo "missed $f or misnumbered it"; return 1; }
+  done
+  grep -q "line(s) 3 match inside ~/tree/twoword.ts" <<<"$out" || { echo "missed the two-word term"; return 1; }
+  for f in bracket-spaced.txt bracket-camel.ts; do
+    grep -q "line(s) 5 match inside ~/tree/$f" <<<"$out" || { echo "missed the bracket-shape term in $f"; return 1; }
+  done
+  grep -q "line(s) 4 match inside ~/tree/prefix.txt" <<<"$out" || { echo "the home rewrite hid a term"; return 1; }
+  grep -q 'the name at ~/tree/(withheld)$' <<<"$out" || { echo "a matching name was not withheld"; return 1; }
+  [[ $(grep -c 'the name at ~/tree/(withheld)$' <<<"$out") -ge 2 ]] || { echo "the file name and the directory name were not both reported"; return 1; }
+  grep -q 'inside ~/tree/new?line.txt' <<<"$out" || { echo "a name with a newline was missed or printed raw"; return 1; }
+  if ((EUID != 0)); then
+    grep -q 'could not read ~/tree/locked.txt' <<<"$out" || { echo "an unreadable file passed as clean"; return 1; }
+    grep -q 'could not read ~/tree/locked.txt' <<<"$rout" || { echo "a relative --path lost the unreadable file's name"; return 1; }
+  fi
+  ((lrc == 1)) && grep -q 'the name at ~/tree/link/(withheld)' <<<"$lout" || { echo "names under a symlinked directory were not checked"; return 1; }
+  ((crc == 0)) || { echo "a clean tree exited $crc (a home path cut by a chunk boundary reads as a match)"; return 1; }
+  grep -q '; 1 archives and compressed documents were not opened' <<<"$out" || { echo "the archive was not counted"; return 1; }
+  if grep -q -e 'home.txt' -e 'clean.txt' <<<"$out"; then echo "a clean file was reported"; return 1; fi
+  if grep -q -i -e 'zorblax' -e 'wib' -e 'quux' <<<"$out$lout"; then echo "a withheld term was printed"; return 1; fi
+}
+
 step 'budget lint' scripts/lint-budgets
 step 'every plugin has evals' evals_present
 step 'identity and secret scan, full history' guard/scan --all
 step 'forbidden names' names_allowed
 step 'statusline tests' statusline_tests
 step 'retro-evidence on a synthetic home' retro_evidence_test
+step 'guard/scan --path on a synthetic tree' path_scan_test
 ((ci)) || step 'claude plugin validate' claude plugin validate .
 
 if ((${#failed[@]})); then
