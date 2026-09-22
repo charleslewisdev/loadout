@@ -16,7 +16,7 @@ Nothing reaches memory, rules or skills until the author merges or says yes. Nev
 
 Use `$LOADOUT_REPO`; otherwise the current repository, when its `.claude-plugin/marketplace.json` names `loadout`. If neither, stop and say: "Set LOADOUT_REPO to the loadout checkout (install.sh sets it), or run the retro from inside it."
 
-In the checkout, stop if `git status --short` shows changes. Then switch to `main`, pull with `--ff-only` when a remote exists, and create the branch `retro/<yyyy-mm-dd>`.
+In the checkout, stop if `git status --short --untracked-files=no` shows changes to tracked files. Untracked files stay out of the retro: stage files by name, never with `git add -A`. Then switch to `main`, pull with `--ff-only` when a remote exists, and create the branch `retro/<yyyy-mm-dd>`.
 
 ## 2. Gather the evidence
 
