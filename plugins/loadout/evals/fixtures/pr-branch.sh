@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Plants a repository with one feature branch for the git-pr case. The branch's
-# commit message claims tests that its diff does not contain.
+# commit messages claim tests and a fix for a missing cursor, and its diff contains
+# neither: after() still raises ValueError for a cursor that is not in the list.
 set -euo pipefail
 g() { git -c user.name=Dev -c user.email=dev@localhost "$@"; }
 git init -q -b main .
@@ -21,3 +22,11 @@ def after(items, cursor, size):
     return items[start:start + size]
 PY
 g add . && g commit -q -m "feat: add cursor pagination with tests"
+cat >>src/pagination.py <<'PY'
+
+
+def first(items, size):
+    """Return the first page."""
+    return after(items, None, size)
+PY
+g add . && g commit -q -m "fix: handle a cursor that is not in the list"
