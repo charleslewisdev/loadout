@@ -50,9 +50,9 @@ The floor is Claude Code's own system prompt, built-in tools and bundled skills.
 
 Four things I learned about reading the number:
 
-- **Runs disagree.** Before loadout, runs varied by up to 827 tokens: a legacy hook's health check and two local MCP servers sometimes finished before the first request. So the script checks the ceiling against the highest of three runs.
+- **Runs disagree.** Before loadout, runs varied by up to 827 tokens: a legacy hook's health check and two local MCP servers sometimes finished before the first request. Now the claude.ai connectors race it, and the share swings between 1,754 and 3,268. So the script checks the ceiling against the highest of three runs.
 - **The skill listing overflows.** On Haiku, 48 skills put 21,698 characters into a listing budgeted at 8,000, so most descriptions get cut. loadout's five model-invoked skills are 860 of those characters; the rest are bundled skills, account-synced skills and a legacy plugin I'm removing.
-- **`claude plugin details` under-reports.** It shows about 0 always-on tokens for loadout, because it counts neither the output style nor anything a session-start hook prints.
+- **`claude plugin details` under-reports.** It counts neither the output style nor anything a session-start hook prints. Before loadout had skills, it showed about 0 always-on tokens while the style was already loading in every session.
 - **A logging proxy is wrong for totals.** With `ANTHROPIC_BASE_URL` set, deferred tool loading switches off, and the same prompt cost 79,181 tokens against 25,378 without it. Use a proxy to see structure, never to count.
 
 **For a team:** every always-on token is paid by every session of every person. Run the same four configurations on the smallest model your team uses, then again inside each main repository to count its CLAUDE.md and rules.

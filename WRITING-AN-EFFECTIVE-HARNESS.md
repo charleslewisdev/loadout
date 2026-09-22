@@ -39,9 +39,9 @@ What I learned about reading that number:
 
 - **Pick the floor carefully.** My first formula passed `--tools ""`, which also strips 15,600 tokens of built-in tools, so the "floor" was too low and the share too high. `--safe-mode` is the clean floor.
 - **Keep the auto-memory section on its own line.** It's about 2,950 tokens of vendor text (12,735 characters), on by choice. Counting it against the harness ceiling would punish a decision I made on purpose.
-- **Run three times and take the highest.** Runs varied by up to 827 tokens. The debug logs showed two races: a legacy session-start hook whose health check sometimes finished inside its timeout (555 to 601 tokens) and two local MCP servers that sometimes connected before the first request (272 tokens).
+- **Run three times and take the highest.** Runs varied by up to 827 tokens. The debug logs showed two races: a legacy session-start hook whose health check sometimes finished inside its timeout (555 to 601 tokens) and two local MCP servers that sometimes connected before the first request (272 tokens). With both gone, the claude.ai connectors race it instead: the latest three runs gave 1,754 to 3,268.
 - **Account-synced skills load in print mode too.** 14 of 59 skills on the first day came from the account, and the only switch for them deletes them.
-- **`claude plugin details` under-reports.** It showed about 0 always-on tokens for loadout, because it counts neither output styles nor what a session-start hook prints.
+- **`claude plugin details` under-reports.** It counts neither output styles nor what a session-start hook prints. Before loadout had skills, it showed about 0 always-on tokens while the style was already loading in every session.
 - **A proxy is for structure, never totals.** With `ANTHROPIC_BASE_URL` set, deferred tool loading switches off. The same prompt cost 79,181 tokens through a logging proxy and 25,378 without it.
 
 Haiku is the measuring model because it has the smallest window in regular use, so truncation shows there first.
