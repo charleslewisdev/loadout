@@ -41,6 +41,7 @@ if [[ -r $b ]]; then
   echo "Vendor floor $(commas "$(lo floor "$b")"); auto-memory section up to $(commas "$(hi automemory "$b")"); MCP servers up to $(commas "$(hi mcp "$b")")."
   if [[ -n $(field listing_chars "$b") ]]; then
     echo "Skill listing: $(field listing_skills "$b") skills, $(commas "$(field listing_chars "$b")") characters against a budget of $(commas "$(field listing_budget "$b")"), so descriptions are cut."
+    hints+=("The skill listing is over its budget on the smallest model, a retro trigger: /loadout:harness-retro reviews unused skills.")
   fi
   [[ $(field result "$b") == pass ]] || hints+=("The harness share is over its ceiling: find the new cost with scripts/budget and cut it before adding anything.")
   e=$(field epoch "$b")
@@ -88,7 +89,7 @@ for m in "$config"/projects/*/memory/MEMORY.md; do
   rows+="$n"$'\t'"$p"$'\n'
 done
 echo "$names indexes; $over100 over 100 lines (a retro trigger), $over200 over 200 (the vendor loads only 200)."
-((over100 > 0)) && hints+=("$over100 memory indexes are over 100 lines, which triggers a retro; the retro skill arrives in phase 3.")
+((over100 > 0)) && hints+=("$over100 memory indexes are over 100 lines, a retro trigger: run /loadout:harness-retro.")
 printf '%s' "$rows" | sort -rn | head -5 | awk -F'\t' '{ printf "  %4d lines  %s\n", $1, $2 }'
 [[ -r $cache/memory-reads ]] && sed -n 's/^  reads per session *\(.*\)/Memory reads per interactive session: \1 (scripts\/memory-reads)./p' "$cache/memory-reads"
 
@@ -100,12 +101,19 @@ echo "statusLine: $(jq -r '.statusLine.command // "unset"' "$settings" 2>/dev/nu
 
 echo
 echo "## Retro"
-last=$(ls "$repo"/retros/*.md 2>/dev/null | sort | tail -1)
+# Retro files are named by date; retros/friction.md is the friction log, not a retro.
+last=$(ls "$repo"/retros/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md 2>/dev/null | sort | tail -1)
 if [[ -n $last ]]; then
   d=$(basename "$last" .md)
-  echo "Last retro $d, $(((now - $(date -d "$d" +%s 2>/dev/null || echo "$now")) / 86400)) days ago. Due every 90 days."
+  e=$(date -d "$d" +%s 2>/dev/null || date -j -f %F "$d" +%s 2>/dev/null || echo "$now")
+  days=$(((now - e) / 86400))
+  echo "Last retro $d, $days days ago. Due every 90 days."
+  ((days > 90)) && hints+=("The last retro was $days days ago, past the 90-day limit: run /loadout:harness-retro.")
+elif [[ -f $here/../harness-retro/SKILL.md ]]; then
+  echo "No retro yet."
+  hints+=("No retro has run yet: run /loadout:harness-retro.")
 else
-  echo "No retro yet. The first is due at the end of phase 3."
+  echo "No retro yet. The retro skill is not installed."
 fi
 
 echo
