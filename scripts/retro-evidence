@@ -46,7 +46,16 @@ if [[ ! -s $tmp/deny ]] || ((rc > 1)); then
   exit 2
 fi
 enc=${HOME//\//-}
-private() { grep -q -i -E -f "$tmp/deny"; }
+# A term hides from word-boundary patterns inside snake_case or camelCase, so
+# every check also reads a copy with _ as a space and capitals split.
+norm() { sed -E 's/_/ /g; s/([a-z0-9])([A-Z])/\1 \2/g'; }
+# Files, not pipes: under pipefail, grep -q quitting early would read as no match.
+private() {
+  cat >"$tmp/chk"
+  grep -q -i -E -f "$tmp/deny" "$tmp/chk" && return 0
+  norm <"$tmp/chk" >"$tmp/chk.norm"
+  grep -q -i -E -f "$tmp/deny" "$tmp/chk.norm"
+}
 
 # ---- prompts ----------------------------------------------------------------
 read_n=0 skipped=0 printmode=0
@@ -66,7 +75,9 @@ for dir in "$config"/projects/*/; do
     { jq -c 'select(.type != "attachment")' "$t" 2>/dev/null || true; } |
       sed -e "s|$HOME|~|g" -e "s|$enc|~|g" >"$tmp/records"
     # Raw JSON hides a term behind an escape such as \n, so check decoded strings too.
-    if private <"$tmp/records" || { jq -r '.. | strings' "$tmp/records" 2>/dev/null || true; } | private; then
+    # Whitespace is collapsed so a two-word term split by a newline still matches.
+    if private <"$tmp/records" ||
+      { jq -r '.. | strings | gsub("\\s+"; " ")' "$tmp/records" 2>/dev/null || true; } | private; then
       skipped=$((skipped + 1))
       continue
     fi
@@ -98,8 +109,8 @@ done
     [[ -f $f ]] && sed 's/^/- /' "$f"
   done
   for ref in $(git -C "$root" for-each-ref --format='%(refname:short)' refs/heads/papercut refs/remotes/origin/papercut 2>/dev/null); do
-    git -C "$root" diff --no-color main..."$ref" -- retros/friction retros/friction.md 2>/dev/null |
-      sed -n "s/^+\([0-9]\{4\}-.*\)/- \1 (open branch $ref)/p"
+    { git -C "$root" diff --no-color main..."$ref" -- retros/friction retros/friction.md 2>/dev/null || true; } |
+      awk -v ref="$ref" '/^\+[0-9][0-9][0-9][0-9]-/ { print "- " substr($0, 2) " (open branch " ref ")" }'
   done
   echo
   echo "## Skill usage (uses, days since last use)"
@@ -110,7 +121,7 @@ done
   echo
   echo "## Corrections (the author redirecting the model)"
   cut -f4 "$tmp/prompts" >"$tmp/texts"
-  grep -n -i -E "(\\bno[,.]|\\b(don't|do not|stop|wrong|instead|actually|not what|i said|again|revert|undo|why did you)\\b)" "$tmp/texts" |
+  { grep -n -i -E "(\\bno[,.]|\\b(don't|do not|stop|wrong|instead|actually|not what|i said|again|revert|undo|why did you)\\b)" "$tmp/texts" || true; } |
     cut -d: -f1 | head -60 | while read -r n; do
       awk -F'\t' -v n="$n" 'NR == n { printf "- %s %s: %s\n", $2, $3, $4 }' "$tmp/prompts"
     done
@@ -123,6 +134,10 @@ done
 } >"$tmp/report"
 
 # Last line of defense: no output line may match the denylist.
-withheld=$(grep -c -i -E -f "$tmp/deny" "$tmp/report" || true)
-grep -v -i -E -f "$tmp/deny" "$tmp/report" | sed -e "s|$HOME|~|g" || true
+: >"$tmp/out"
+withheld=0
+while IFS= read -r line; do
+  if printf '%s\n' "$line" | private; then withheld=$((withheld + 1)); else printf '%s\n' "$line" >>"$tmp/out"; fi
+done <"$tmp/report"
+sed -e "s|$HOME|~|g" "$tmp/out"
 ((withheld == 0)) || echo "($withheld lines withheld: they match the denylist)"
