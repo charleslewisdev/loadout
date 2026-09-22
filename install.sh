@@ -15,7 +15,7 @@
 # machines where that tie is acceptable.
 set -euo pipefail
 
-usage() { sed -n '2,14s/^# \{0,1\}//p' "$0" >&2; exit 2; }
+usage() { awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" >&2; exit 2; }
 
 here=$(cd "$(dirname "$0")" && pwd)
 profile=''
