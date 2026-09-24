@@ -13,7 +13,7 @@ Read the whole plan once. Before starting, name any task that cannot be done fro
 
 ## 2. One subagent per task
 
-For each task, dispatch a fresh subagent with the Agent tool. Its prompt carries everything it needs, so it never reads the plan itself:
+For each task, dispatch a fresh subagent with the Agent tool. Set its `model` every time, since a subagent left without one runs on this session's model: `sonnet` for a task whose text says what to build, `opus` for one that leaves a design choice open or repeats a failed attempt. Its prompt carries everything it needs, so it never reads the plan itself:
 
 - the task's full text, pasted
 - where it fits: what earlier tasks built and which files they touched

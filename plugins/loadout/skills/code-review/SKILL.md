@@ -22,23 +22,25 @@ When the change touches UI, start the app with the built-in `run` skill and look
 
 Start one fresh subagent per reviewer below, all in parallel, never a fork: a fork inherits this conversation and the output style. Give each only its brief (the file under `reviewers/` in this skill's directory), the scope from stage 0, and the check results from stage 1. No reviewer sees another's work.
 
+Pass each subagent the model named below in the Agent tool's `model` field. Left out, every subagent runs on this session's model, and several Fable reviewers at once exhaust the machine and the usage limit. Opus goes where judgment decides the result; Sonnet reads and matches.
+
 Always:
 
-- `reviewers/correctness.md`: bugs in the changed lines
-- `reviewers/history.md`: the change against the history of the code it touches
-- `reviewers/project-rules.md`: CLAUDE.md files and code comments that apply
-- `reviewers/tests.md`: whether tests prove the change, and what fails silently
+- `reviewers/correctness.md`, opus: bugs in the changed lines
+- `reviewers/history.md`, sonnet: the change against the history of the code it touches
+- `reviewers/project-rules.md`, sonnet: CLAUDE.md files and code comments that apply
+- `reviewers/tests.md`, sonnet: whether tests prove the change, and what fails silently
 
 When the diff calls for it:
 
-- security, when the change touches input handling, authentication, secrets, file or network access, or dependencies: run the built-in `/security-review`
-- `reviewers/ux.md`, when the change touches UI or user-facing text
+- security, opus, when the change touches input handling, authentication, secrets, file or network access, or dependencies: a subagent that runs the built-in `/security-review` and returns its findings
+- `reviewers/ux.md`, sonnet, when the change touches UI or user-facing text
 
 Each reviewer returns findings as: file and line, what is wrong, the concrete input or state that makes it fail, its evidence, and a severity from stage 4 (Blocking, Should fix, Consider).
 
 ## 3. Verify every finding
 
-First merge duplicates across reviewers, keeping the strongest evidence and the highest severity. Then send the findings to verifiers with `reviewers/verifier.md`, a few findings per verifier and the verifiers in parallel. Each finding gets a score from 0 to 100 on that rubric, checked on the verifier's own evidence. Drop findings under 80, except a finding confirmed against a rule its CLAUDE.md states: the rubric puts those at 75, so keep them at 75 and above.
+First merge duplicates across reviewers, keeping the strongest evidence and the highest severity. Then send the findings to verifiers with `reviewers/verifier.md`, on opus, a few findings per verifier and the verifiers in parallel. Each finding gets a score from 0 to 100 on that rubric, checked on the verifier's own evidence. Drop findings under 80, except a finding confirmed against a rule its CLAUDE.md states: the rubric puts those at 75, so keep them at 75 and above.
 
 ## 4. Report
 

@@ -1,8 +1,8 @@
 # code-review smoke case, typed: /loadout:code-review on a feature branch with a
 # counting bug its own test misses and a broken project rule. The skill's point is
-# the team: checks first, independent reviewer subagents, a verifier. The skill is
-# typed only, because a bundled skill is also named code-review and the model picks
-# that one. Run with --scaffold --allow-tools Bash Agent.
+# the team: checks first, independent reviewer subagents on the models the skill
+# names, a verifier. The skill is typed only, because a bundled skill is also named
+# code-review and the model picks that one. Run with --scaffold --allow-tools Bash Agent.
 schema_version: "1.1"
 name: code-review-smoke
 tags: [smoke, code-review]
@@ -23,6 +23,15 @@ graders:
     type: tool_used
     tool: Agent
     min: 3
+  - name: reviewers-on-sonnet
+    type: tool_used
+    tool: Agent
+    input_match: "model.{0,4}sonnet"
+    min: 2
+  - name: correctness-on-opus
+    type: tool_used
+    tool: Agent
+    input_match: "model.{0,4}opus"
   - name: found-the-bug
     type: llm
     criteria: "Pass only if the review reports that page_count undercounts when total is not a multiple of per_page (for example 10 items at 3 per page gives 3 instead of 4 pages)."

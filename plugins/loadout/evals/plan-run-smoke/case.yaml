@@ -22,6 +22,11 @@ graders:
     type: tool_used
     tool: Agent
     min: 2
+  - name: tasks-on-sonnet
+    type: tool_used
+    tool: Agent
+    input_match: "model.{0,4}sonnet"
+    min: 2
   - name: slugify-written
     type: file_exists
     path: src/text_utils.py
