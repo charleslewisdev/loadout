@@ -8,6 +8,8 @@
 # and wraps it for tmux or screen when it runs inside one (binary, 2.1.278).
 # Notification payloads carry their own message, which replaces the event text.
 input=$(cat)
+# Under Crystal Bridge there is no terminal to ring, and the bridge sends its own notifications.
+[[ -n ${CRYSTAL_SESSION:-} ]] && exit 0
 cwd=$(jq -r '.cwd // empty' <<<"$input" 2>/dev/null)
 message=$(jq -r '.message // empty' <<<"$input" 2>/dev/null)
 project=$(basename "${cwd:-$PWD}")
