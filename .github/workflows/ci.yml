@@ -1,5 +1,8 @@
 name: ci
-on: push
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
 jobs:
@@ -9,5 +12,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # The PR head, not GitHub's synthetic merge commit, whose author fails the email check.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Checks (no Claude credentials, no denylist)
         run: scripts/check --ci

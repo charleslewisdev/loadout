@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# PreToolUse hook on Bash: every gh command except a known read-only one is treated
+# as publishing, and the text it would publish is scanned by guard/scan text before
+# it runs: the command itself (titles, inline bodies, field values) and every file
+# it reads text from. Exit 2 blocks the call; findings name line numbers in the
+# scanned text, never the match.
+#
+# Fails closed on what it can't read: shell expansion, a chain with other commands
+# (a file could change between the scan and the post), stdin bodies outside a
+# heredoc, gists, unreadable files, and a missing jq or denylist.
+set -uo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+input=$(cat)
+block() { echo "guard/gh-hook: $*" >&2; exit 2; }
+if ! command -v jq >/dev/null; then
+  grep -q 'gh ' <<<"$input" && block "jq is missing, so gh commands can't be checked"
+  exit 0
+fi
+cmd=$(jq -r '.tool_input.command // empty' <<<"$input")
+cwd=$(jq -r '.cwd // empty' <<<"$input")
+[[ -n $cwd ]] || cwd=$PWD
+
+# gh counts where a command starts: a line start or after ; & | ( with optional
+# wrappers or VAR=value, and a path before gh. A heredoc line or a quoted string
+# that mentions gh mid-line passes.
+start='(^|[;&|(])[[:space:]]*((env|command|time|exec|xargs|sudo|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)[[:space:]]+)*([^[:space:];&|()]*/)?gh[[:space:]]'
+grep -q -E "$start" <<<"$cmd" || exit 0
+
+# Read-only: whole groups, verbs, and gh api calls that send nothing.
+readonly_line() {  # line: 0 when the gh command on it publishes nothing
+  local -a w
+  read -ra w <<<"${1#*gh }"
+  local group=${w[0]:-} verb='' i=1
+  while ((i < ${#w[@]})); do
+    case ${w[i]} in
+      -R | --repo) ((i += 2)) ;;
+      -*) ((i++)) ;;
+      *) verb=${w[i]}; break ;;
+    esac
+  done
+  case $group in
+    search | status | browse | help | version | auth | completion | --version | --help | '') return 0 ;;
+    api)
+      if [[ " ${w[*]} " == *" graphql "* ]]; then
+        ! grep -q -i 'mutation' <<<"$1"
+        return
+      fi
+      ! grep -q -E '[[:space:]](-f|-F|--field|--raw-field|--input|-X[[:space:]]*(POST|PATCH|PUT|DELETE)|--method[[:space:]=]+(POST|PATCH|PUT|DELETE))' <<<" $1"
+      return ;;
+  esac
+  case $verb in
+    list | view | status | diff | checks | checkout | download | watch | clone) return 0 ;;
+  esac
+  return 1
+}
+
+# The lines holding a publishing gh command. With a heredoc, only the first line
+# may be a command, since the rest is the heredoc's text.
+mapfile -t lines <<<"$cmd"
+heredoc=0
+grep -q '<<' <<<"${lines[0]}" && heredoc=1
+publishing=()
+for line in "${lines[@]}"; do
+  grep -q -E "$start" <<<"$line" || continue
+  readonly_line "$line" && continue
+  publishing+=("$line")
+done
+((${#publishing[@]})) || exit 0
+
+grep -q -E '\$\(|`|<\(|\$[A-Za-z_{]' <<<"$cmd" &&
+  block "shell expansion in a publishing gh command can't be scanned; write the text to a file and pass it with --body-file"
+
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+v='("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:];&|]+)'
+fileflags='--body-file|--notes-file|--input|-F|--field'
+for line in "${publishing[@]}"; do
+  # Alone on its line, after at most a leading cd: chained commands could write
+  # a file after the scan, or feed text in that the scan never sees.
+  here=$cwd
+  if [[ $line =~ ^[[:space:]]*cd[[:space:]]+([^[:space:];&|]+)[[:space:]]*\&\&(.*)$ ]]; then
+    d=${BASH_REMATCH[1]}
+    line=${BASH_REMATCH[2]}
+    [[ $d == "~"* ]] && d=$HOME${d#\~}
+    [[ $d == /* ]] && here=$d || here=$cwd/$d
+  fi
+  body=$line
+  ((heredoc)) && body=${line%%<<*}
+  alone='^[[:space:]]*((env|command|time|exec|sudo|[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*)[[:space:]]+)*([^[:space:]]*/)?gh[[:space:]][^;&|]*$'
+  [[ $body =~ $alone ]] || block "run a publishing gh command on its own, not chained with other commands"
+  grep -q -E '(^|[[:space:]])gh[[:space:]]+gist[[:space:]]' <<<"$line" &&
+    block "gists aren't scanned by this hook; create them by hand"
+  if grep -q -E "($fileflags|-a|--add)([[:space:]]+|=)-([[:space:]]|$)" <<<"$line" ||
+    grep -q -E '[[:space:]]<[^<]' <<<"$line"; then
+    ((heredoc)) || block "a body from stdin can't be scanned; use --body-file with a file, or a heredoc"
+  fi
+
+  # The command without its file paths and leading cd (paths never reach GitHub,
+  # and a home path can match the denylist); the files' contents follow it.
+  sed -E -e "s/(--body-file|--notes-file|--input)([[:space:]]+|=)$v/\\1 FILE/g" \
+    -e "s/(-F|--field)([[:space:]]+|=)?([^[:space:]=]+=)@$v/\\1 \\3@FILE/g" \
+    -e "s/-F([[:space:]]+|=)([^[:space:]=@\"'-][^[:space:]=\"']*|\"[^\"=]*\"|'[^'=]*')([[:space:];&|]|\$)/-F FILE\\3/g" <<<"$line" >>"$tmp"
+  while IFS= read -r f; do
+    f=${f#\"}; f=${f%\"}; f=${f#\'}; f=${f%\'}
+    [[ $f == *=@* ]] && f=${f#*=@}
+    [[ $f == *=* || $f == - ]] && continue
+    [[ $f == "~"/* ]] && f=$HOME/${f#\~/}
+    [[ $f == /* ]] || f=$here/$f
+    [[ -r $f ]] || block "can't read $f to scan it; write the file in an earlier call"
+    cat "$f" >>"$tmp"
+  done < <(grep -o -E "($fileflags)([[:space:]]+|=)?$v" <<<"$line" | sed -E "s/^($fileflags)([[:space:]]+|=)?//")
+done
+# A heredoc's text is published too.
+((heredoc)) && printf '%s\n' "${lines[@]:1}" >>"$tmp"
+
+if ! out=$(GUARD_REQUIRE_DENYLIST=1 "$root/guard/scan" text "$tmp" 2>&1); then
+  printf '%s\n' "guard/gh-hook: blocked; the text failed the identity guard:" "$out" >&2
+  exit 2
+fi
+exit 0
