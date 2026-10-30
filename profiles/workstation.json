@@ -2,16 +2,15 @@
   "extraKnownMarketplaces": {
     "loadout": {
       "source": {
-        "source": "github",
-        "repo": "charleslewisdev/loadout",
         "ref": "main"
       }
     }
   },
   "enabledPlugins": {
-    "loadout@loadout": true
+    "loadout@loadout": true,
+    "bard@loadout": true
   },
-  "outputStyle": "loadout:peer",
+  "outputStyle": "bard:peer",
   "cleanupPeriodDays": 120,
   "env": {
     "CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE": "1"

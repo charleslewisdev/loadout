@@ -1,4 +1,4 @@
-# S6, the README test: a fresh session with only README.md answers four questions.
+# The README test: a fresh session with only README.md answers four questions.
 # It tests the README, not the plugin, so the delta is about zero by design; it
 # passes when every answer is complete. The without arm is the stricter reading of
 # "only the README in context". Facts are graded by regex, judgment by llm.

@@ -4,7 +4,7 @@
 #   scripts/hook-report [days]     default 7
 #
 # Prints calls, p50, p95 and max in milliseconds per hook, nearest-rank
-# percentiles, and how many runs were killed (a killed run's time is a lower bound). Budgets (ADR-09): SessionStart 300 ms, notify 100 ms, formatter
+# percentiles, and how many runs were killed (a killed run's time is a lower bound). Budgets: SessionStart 300 ms, notify 100 ms, formatter
 # 300 ms, Bash guard 50 ms at p95.
 set -euo pipefail
 

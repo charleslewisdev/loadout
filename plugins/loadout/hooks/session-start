@@ -3,11 +3,12 @@
 # otherwise one JSON line whose systemMessage names each problem and its fix.
 # systemMessage reaches the user, never the model, so the check costs no tokens.
 #
-# Configured means: outputStyle is loadout:peer, and statusLine.command, when it
-# points into the loadout harness, is an executable file.
+# Configured means: with the bard plugin enabled, outputStyle is bard:peer (the
+# forced style alone skips the per-prompt reminder); and statusLine.command, when
+# it points into the loadout harness, is an executable file.
 
 settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
-fix='run ./install.sh workstation in the loadout checkout'
+fix='run ./install.sh <profile> in the loadout checkout'
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '{"systemMessage":"loadout: jq is not installed, so the configuration check cannot run"}\n'
@@ -15,11 +16,13 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 problems=()
-style=$(jq -r '.outputStyle // empty' "$settings" 2>/dev/null)
-if [[ $style != loadout:peer ]]; then
-  problems+=("outputStyle is ${style:-unset}, not loadout:peer ($fix)")
+if [[ $(jq -r '.outputStyle // empty' "$settings" 2>/dev/null) == loadout:peer ]]; then
+  problems+=("outputStyle is loadout:peer, which moved to bard:peer in 0.8.0; enable the bard plugin or clear it ($fix)")
 fi
-
+if jq -e '.enabledPlugins["bard@loadout"] == true' "$settings" >/dev/null 2>&1; then
+  style=$(jq -r '.outputStyle // empty' "$settings" 2>/dev/null)
+  [[ $style == bard:peer ]] || problems+=("bard is enabled but outputStyle is ${style:-unset}, not bard:peer ($fix)")
+fi
 statusline=$(jq -r '.statusLine.command // empty' "$settings" 2>/dev/null)
 path=${statusline%% *}
 path=${path/#\~/$HOME}

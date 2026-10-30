@@ -1,12 +1,19 @@
 {
   "name": "loadout",
-  "owner": { "name": "charleslewisdev" },
-  "description": "A personal Claude Code harness with measured budgets.",
+  "owner": {
+    "name": "charleslewisdev"
+  },
+  "description": "A measured Claude Code loadout you can fork: equip only what earns its slot.",
   "plugins": [
     {
       "name": "loadout",
       "source": "./plugins/loadout",
-      "description": "Always-on harness: the peer output style and a silent configuration check."
+      "description": "A measured Claude Code harness: skills for planning, debugging, review and PRs, harness retros, hooks and a statusline."
+    },
+    {
+      "name": "bard",
+      "source": "./plugins/bard",
+      "description": "An opinionated voice, optional: the peer output style (forced while enabled) and scribe-as-me for text published under your name."
     }
   ]
 }

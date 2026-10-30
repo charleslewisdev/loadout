@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# File budgets from the plan's ceiling table. No network, no Claude.
+# File budgets. No network, no Claude.
 #
 #   scripts/lint-budgets [root]     root defaults to this repo
 #

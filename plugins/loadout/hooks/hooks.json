@@ -16,6 +16,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/hook-timed\" review-gate -- \"${CLAUDE_PLUGIN_ROOT}/hooks/review-gate\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/hook-timed\" notify-stop -- \"${CLAUDE_PLUGIN_ROOT}/hooks/notify\" 'task complete'",
             "timeout": 5
           }

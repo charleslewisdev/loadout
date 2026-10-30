@@ -1,0 +1,8 @@
+{
+  "name": "bard",
+  "version": "0.8.0",
+  "description": "An opinionated voice, optional: the peer output style (forced while enabled) and scribe-as-me for text published under your name.",
+  "author": {
+    "name": "charleslewisdev"
+  }
+}

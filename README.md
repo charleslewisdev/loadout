@@ -1,6 +1,8 @@
 # loadout
 
-loadout is my Claude Code harness: one plugin marketplace, one always-on plugin, and the scripts that measure what the harness costs every session. It holds an output style, eleven skills (one of them a retro that proposes deletions), four hooks and a statusline. A new machine runs one installer and gets the same setup.
+*A measured Claude Code loadout you can fork: equip only what earns its slot.*
+
+loadout is my Claude Code harness: one plugin marketplace, two plugins, and the scripts that measure what the harness costs every session. The `loadout` plugin holds nine skills (one of them a retro that proposes deletions), five hooks and a statusline. The optional `bard` plugin holds my output style and the skill that writes under my name. A new machine runs one installer and gets the same setup.
 
 I wrote this README for two readers:
 
@@ -11,16 +13,24 @@ Fork it and edit it; don't install it as-is. It encodes one person's taste. Wher
 
 ## Install
 
-Fork the repo first. The profile's marketplace source names my repo and tracks its `main`, so set `repo` in `profiles/workstation.json` to your fork before the first install; otherwise you get my plugin, forced style included, updating whenever I push.
+You need bash 5 or newer (on macOS, `brew install bash`), `git`, `jq`, `perl` and the `claude` CLI; `gh` for the PR and retro skills.
+
+Fork the repo first. The installer reads the marketplace source from your checkout's `origin`, so a fork installs from the fork and updates only when you push. `profiles/example.json` enables `loadout` alone; `profiles/workstation.json` is my machine, with `bard` and its forced style.
 
 ```
 git clone https://github.com/<you>/loadout ~/code/loadout
-~/code/loadout/install.sh workstation
+~/code/loadout/install.sh example
 ```
 
-The installer backs up `~/.claude/settings.json` to `~/.claude/backups/`, then deep-merges `profiles/workstation.json` over it with `jq`. The profile registers this marketplace, enables the `loadout` plugin, sets `outputStyle: "loadout:peer"`, points the statusline at the marketplace clone, keeps transcripts 120 days and turns off AI attribution in commits and PRs. Every other key you have survives, and a second run changes nothing. A plugin cannot ship your user `~/.claude/CLAUDE.md`, so that file stays yours.
+The installer backs up `~/.claude/settings.json` to `~/.claude/backups/`, then deep-merges the profile over it with `jq`. The example profile registers your marketplace, enables the `loadout` plugin and points the statusline at the marketplace clone. Mine also enables `bard`, sets `outputStyle: "bard:peer"`, keeps transcripts 120 days and turns off AI attribution in commits and PRs. Every other key you have survives, and a second run changes nothing. A plugin cannot ship your user `~/.claude/CLAUDE.md`, so that file stays yours.
 
-To change the repo itself, run `git config core.hooksPath .githooks` so the identity guard runs, and `scripts/check` before a PR.
+To uninstall, run `claude plugin uninstall loadout@loadout` (and `bard@loadout` if you enabled it), then `claude plugin marketplace remove loadout`. Then restore `settings.json` from the oldest file in `~/.claude/backups/`, taken before your first install, or delete the keys the profile added, `statusLine` and `env.LOADOUT_REPO` included.
+
+To change the repo itself, run `git config core.hooksPath .githooks` so the identity guard runs, and `scripts/check` before a PR. [CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
+
+## Crystal Bridge
+
+loadout grew up beside [Crystal Bridge](https://github.com/crystal-bridge/crystal-bridge), a web UI that runs Claude Code sessions across machines from one hub and dresses them up as a 16-bit RPG. That's where the flavor here comes from: its Inventory panel lists these skills, and the names below read like gear. Neither needs the other. The one seam is `CRYSTAL_SESSION`: any host that sends its own notifications can set it, and the notify hook stays quiet.
 
 ## Why a harness exists
 
@@ -30,7 +40,7 @@ The failure to guard against is growth. My earlier harnesses worked, then gather
 
 So this harness is small, and the tools that keep it small came first. The identity guard, the budget script and the eval runner landed together in the first real commit, with the one style they needed to be tested on; the first skill arrived a phase later, as `git log --reverse --name-only` shows.
 
-## What it costs, measured
+## Encumbrance: what it costs, measured
 
 Every session pays for what loads before your first prompt. I measure that with a command, never an estimate:
 
@@ -53,7 +63,7 @@ The floor is Claude Code's own system prompt, built-in tools and bundled skills.
 Four things I learned about reading the number:
 
 - **Runs disagree.** Before loadout, runs varied by up to 827 tokens: a legacy hook's health check and two local MCP servers sometimes finished before the first request. Now the claude.ai connectors race it: one set of three runs gave 1,754 to 3,268. So the script checks the ceiling against the highest of three runs.
-- **The skill listing overflows.** On Haiku, 34 skills put 17,981 characters into a listing budgeted at 8,000, so most descriptions get cut. loadout's five model-invoked skills are 860 of those characters; most of the rest are bundled and account-synced skills. Past the budget, descriptions are cut to fit, so removing skills saves little: taking out 14 cut 3,717 characters of descriptions, and the share rose by 15 tokens.
+- **The skill listing overflows.** On Haiku, 34 skills put 17,981 characters into a listing budgeted at 8,000, so most descriptions get cut. loadout's five model-invoked skills were 860 of those characters (six since `review-party` became model-invoked: 1,048); most of the rest are bundled and account-synced skills. Past the budget, descriptions are cut to fit, so removing skills saves little: taking out 14 cut 3,717 characters of descriptions, and the share rose by 15 tokens.
 - **`claude plugin details` under-reports.** It counts neither the output style nor anything a session-start hook prints. Before loadout had skills, it showed about 0 always-on tokens while the style was already loading in every session.
 - **A logging proxy is wrong for totals.** With `ANTHROPIC_BASE_URL` set, deferred tool loading switches off, and the same prompt cost 79,181 tokens against 25,378 without it. Use a proxy to see structure, never to count.
 
@@ -92,8 +102,8 @@ Every always-on surface has a target and a ceiling. `scripts/budget` measures th
 | User CLAUDE.md | about 30 lines | 200 lines | 41 lines (warning) | the docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | about 80 lines | 200 lines | template under 20 | build, test, conventions that differ, pitfalls |
 | SKILL.md body | under 150 lines | 500 lines | at most 65 lines | the docs: "Keep `SKILL.md` under 500 lines" |
-| One skill description | | 200 characters | 132 to 182 | the listing budget below |
-| All harness descriptions | | 5,000 characters | 1,782 | the listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
+| One skill description | | 200 characters | 132 to 188 | the listing budget below |
+| All harness descriptions | | 5,000 characters | 1,626 | the listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
 | Session-start output | nothing on a configured machine | 300 characters | 0 | re-sent after every compaction; checked by hand, not linted |
 
 The 200-line ceiling rests on token cost, not adherence. A factorial study measured compliance of 60.0, 65.2, 67.7 and 64.0 percent at 25, 100, 250 and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)).
@@ -102,9 +112,9 @@ The 200-line ceiling rests on token cost, not adherence. A factorial study measu
 
 ## Identity and voice
 
-Register lives in one forced output style, `peer`. It describes me as the reader: a senior engineer who wants a peer, with an exception for database design and performance, where it should explain its reasoning and flag risks. It asks for plain language, sentences around twenty words, and every reference explained before it's used. It bans four habits of machine prose and six filler words, asks it to relay reviewer findings with their severity intact, and asks it to run the project's checks and show the output before calling anything done. The wording is **opinion**; replace it with your own.
+Register lives in one forced output style, `peer`, in the optional `bard` plugin. It describes me as the reader: a senior engineer who wants a peer, with an exception for database design and performance, where it should explain its reasoning and flag risks. It asks for plain language, sentences around twenty words, and every reference explained before it's used. It bans four habits of machine prose and six filler words, asks it to relay reviewer findings with their severity intact, and asks it to run the project's checks and show the output before calling anything done. The wording is **opinion**; replace it with your own.
 
-**How it's delivered.** The style ships in the plugin with `force-for-plugin: true`, and the installer also sets `outputStyle`. Both are needed. The per-prompt reminder is skipped when `outputStyle` is unset, before Claude Code looks at forced styles, so forcing alone delivers the body without the reminder. The eval sandbox can't set `outputStyle`, so only a forced style can be tested at all.
+**How it's delivered.** The style ships in `bard` with `force-for-plugin: true`, and my profile also sets `outputStyle`. Both are needed. The per-prompt reminder is skipped when `outputStyle` is unset, before Claude Code looks at forced styles, so forcing alone delivers the body without the reminder. The eval sandbox can't set `outputStyle`, so only a forced style can be tested at all.
 
 **What it can do.** Make sessions better to work in. That's the whole claim: it's a comfort trade. Across 162 personas, four model families and 2,410 factual questions, no persona beat a no-persona control ([Zheng et al., EMNLP 2024 Findings](https://aclanthology.org/2024.findings-emnlp.888/)).
 
@@ -115,28 +125,37 @@ Register lives in one forced output style, `peer`. It describes me as the reader
 - **Packing matters.** As one clause in a list of banned things, the em-dash rule held in 1 of 5 runs. As its own sentence, "Never write the em-dash character; use a comma, a colon or a new sentence.", it held in 9 of 10.
 - **Most anti-sycophancy rules were already default behavior.** I started with rules to restate claims as questions, hold a recommendation under pushback, state assumptions, decline requests built on a wrong premise, and a humor sentence. Eighteen cases on Sonnet 5, and the ones with no delta again on Opus 5, scored the same with and without every one of them, so all five went. Asking in place of asserting does reduce sycophancy in the literature ([UK AISI, arXiv 2602.23971](https://arxiv.org/abs/2602.23971)); on these cases both models already caught the planted errors without the rule. Only the writing rules still show a positive delta (0.97 against 0.87). The verify-before-done sentence scored 0.17 to 0.33 against 0, but what it changed is how replies report checks, not whether the model runs them. The filler-word rule showed no difference because the baseline already avoided those words on the test prompt, and it stays until a prompt that elicits them can judge it.
 
-Writing as me in public is a separate, typed-only skill, `/loadout:write-as-me`: first person, no em-dashes, emoji only as list markers. It drafts and never posts.
+Writing as me in public is a separate, typed-only skill, `/bard:scribe-as-me`: first person, no em-dashes, emoji only as list markers. It drafts and never posts.
 
 **For a team (opinion):** don't force a style. A forced style overrides everyone's choice while its plugin is enabled. Ship two or three styles people can pick, and put shared rules in reviewed places instead.
 
-## Skills
+## Inventory: the skills
 
 | Skill | Invoked by | What it does |
 | --- | --- | --- |
-| `code-debug` | model | reproduces the bug with a failing test before changing code |
-| `git-pr` | model | branch, commit and PR conventions, checking each PR claim against `git diff` |
-| `plan-brainstorm`, `plan-write`, `plan-run` | model | open idea to decision; decision to a plan with a test per task; the plan run task by task in fresh subagents |
-| `code-review` | typed | runs checks and the app, sends independent reviewers, then a verifier drops findings under 80 of 100 |
-| `code-verify` | typed | runs the checks that cover a change and shows the output |
-| `write-as-me` | typed | drafts text published under my name |
-| `harness-status`, `harness-retro`, `harness-papercut` | typed | the harness's measured state; the 90-day retro; one line of friction for the retro to read |
+| `bug-hunt` | model | reproduces the bug with a failing test before changing code |
+| `pr-turn-in` | model | branch, commit and PR conventions, checking each PR claim against `git diff` |
+| `map-scout`, `map-draw`, `map-follow` | model | open idea to decision; decision to a plan with a test per task; the plan run task by task in fresh subagents |
+| `review-party` | model | runs checks and the app, sends independent reviewers, then a verifier drops findings under 80 of 100; the review gate makes Claude run it on its own work before calling it done |
+| `scribe-as-me` (`bard`) | typed | drafts text published under my name |
+| `gear-stats`, `gear-respec`, `gear-mend` | typed | the harness's measured state; the 90-day retro; one line of friction for the retro to read |
 
-Names are `<domain>-<action>`, so the slash menu groups them. Two skills became typed-only after their evals. `code-verify` fired in 0 of 6 runs as a model-invoked skill, so its rule moved into the style as one sentence. `code-review` collided with a bundled skill of the same name, and the model picked the bundled one.
+Names lead with their subject (`gear-`, `map-`, `review-`), so the slash menu, which sorts alphabetically, groups them, and end with a word of flavor. Two skills changed after their evals. `code-verify` fired in 0 of 6 runs as a model-invoked skill, so its rule moved into the style as one sentence and the skill was retired. The reviewer, first named `code-review`, collided with a bundled skill of the same name and the model picked the bundled one; renamed `review-party`, it is model-invoked again. A skill description can't guarantee a review, so self-review is a hook: `review-gate` blocks a stop once when two or more files changed since the last review.
+
+### One ticket, start to finish
+
+1. `map-scout` when the approach is still open.
+2. `map-draw` when the work spans sessions, then `map-follow` to carry out the plan.
+3. `bug-hunt` when something breaks along the way.
+4. `review-party` before you call it done. `review-gate` holds Claude to this on multi-file work.
+5. `pr-turn-in` to commit and open the PR, and `scribe-as-me` for replies under your name.
+
+The `gear-` skills sit outside the ticket: `gear-stats` to read the sheet, `gear-mend` when something annoys you, and `gear-respec` for the periodic retro.
 
 ### Adding a skill
 
 1. Write the eval first: `plugins/loadout/evals/<name>-smoke/case.yaml`, with a `tool_used: Skill` grader marked `arm: with-only` and at least one grader for the result.
-2. Create `plugins/loadout/skills/<domain>-<action>/SKILL.md`. The description stays under 200 characters and says what it does and when to use it; the body stays under 150 lines. Add `disable-model-invocation: true` if people type it rather than the model picking it.
+2. Create `plugins/loadout/skills/<subject>-<flavor>/SKILL.md`. The description stays under 200 characters and says what it does and when to use it; the body stays under 150 lines. Add `disable-model-invocation: true` if people type it rather than the model picking it.
 3. Run `scripts/eval plugins/loadout --case <name>-smoke` (add `--scaffold --allow-tools Bash Edit Write` when the case plants files). Keep the skill only if the with-plugin arm beats the baseline.
 4. Run `scripts/check`, open a PR, and after the merge invoke the skill once by name, so its usage score starts above zero.
 
@@ -169,13 +188,13 @@ Three splits save nothing or lose data:
 
 **For a team:** a table of people is personal data. Keep it out of public repos, and query the company directory (rung 6) rather than copying it.
 
-## Hooks, memory and the retro
+## Save points: hooks, memory and the retro
 
-**Hooks.** Five slots, four with a p95 budget: session start 300 ms, notifications 100 ms, a formatter 300 ms that runs only where the repo configures prettier or ruff, and a Bash guard 50 ms. The Bash guard and the per-prompt slot are empty. Every hook runs through `hook-timed`, which logs its start and end, and `scripts/hook-report` prints p50, p95 and max; the lint fails a hook that bypasses the wrapper. Over the 30 days to 2026-09-21: session start p95 20.9 ms over 167 calls, the stop notification 12.0 ms over 141. A hook over budget for a week gets deleted.
+**Hooks.** Five slots, four with a p95 budget: session start 300 ms, notifications 100 ms, a formatter 300 ms that runs only where the repo configures prettier or ruff, and a Bash guard 50 ms. The Bash guard and the per-prompt slot are empty. On stop, `review-gate` also blocks once per batch of work when two or more files changed since the last `review-party`, because a review that must always happen can't be left to a skill description. It reads subagent transcripts too, and edits in the review's own turn count as its fixes. `LOADOUT_REVIEW_GATE=0` turns it off and `LOADOUT_REVIEW_MIN_FILES` raises the bar. Every hook runs through `hook-timed`, which logs its start and end, and `scripts/hook-report` prints p50, p95 and max; the lint fails a hook that bypasses the wrapper. Over the 30 days to 2026-09-21: session start p95 20.9 ms over 167 calls, the stop notification 12.0 ms over 141. A hook over budget for a week gets deleted.
 
 **Memory.** One store: Claude Code's native auto-memory. Transcripts are the raw record, kept 120 days and never summarized, because repeated model consolidation of memory "can fall below the no-memory baseline" ([arXiv 2605.12978](https://arxiv.org/abs/2605.12978)). Knowledge becomes a rule or a skill only through a pull request I review, so a poisoned tool result has no path into future sessions. My MCP memory server and notes server moved out of coding sessions into the one project that uses them.
 
-**The retro.** `/loadout:harness-retro` runs every 90 days at most, sooner if the harness's own skill descriptions pass 4,000 characters, near their ceiling, a memory index passes 100 lines or a skill passes 500. It reads the friction log, my corrections in transcripts, unread memory, the budgets and skill usage, and opens one pull request of proposed additions and deletions. The first one cut two memory indexes from 156 and 144 lines to 21 and 19.
+**The retro.** `/loadout:gear-respec` runs every 90 days at most, sooner if the harness's own skill descriptions pass 4,000 characters, near their ceiling, a memory index passes 100 lines or a skill passes 500. It reads the friction log, my corrections in transcripts, unread memory, the budgets and skill usage, and opens one pull request of proposed additions and deletions. The first one cut two memory indexes from 156 and 144 lines to 21 and 19.
 
 **For a team:** auto-memory is one user on one machine and never propagates. Knowledge the team needs belongs where review already happens: the project CLAUDE.md, `.claude/rules/`, and skills in the team marketplace. The promotion step stays a reviewed pull request.
 
@@ -193,7 +212,7 @@ The shape changes more than the mechanisms:
 
 An audit a team harness can run on itself:
 
-1. **Measure the share** as in [What it costs](#what-it-costs-measured). Don't use `claude plugin details` for totals.
+1. **Measure the share** as in [What it costs](#encumbrance-what-it-costs-measured). Don't use `claude plugin details` for totals.
 2. **Inventory the always-on surfaces:** every CLAUDE.md a session loads, output styles, session-start output, skill and agent descriptions, MCP server instructions, and any hook that returns `additionalContext` on every tool call. Give each a target and a ceiling from the budget table, and lint them in CI.
 3. **Check the skill listing** in a debug log. The line to look for starts "Skill listing over budget".
 4. **Time every hook** through a wrapper, give each event a p95 budget, and delete what stays over.
@@ -206,8 +225,12 @@ Two traps worth checking first. A marketplace added under a name that already ex
 
 ## If you fork it
 
-Point `repo` in `profiles/workstation.json` at your fork before the first install. Keep the mechanisms: the budget script and lint, the eval runner with `--no-publish`, the hook wrapper, the installer, the one-store memory rule and the reference ladder. Replace the opinions: the style's wording, the skill set, the statusline segments, the hook budgets and the retro's cadence.
+Start from `profiles/example.json`. Add your commit email to `guard/allowed-emails` (see `guard/allowed-emails.example`), or pre-commit and CI will reject your commits; keep the lines already there, because the history you forked needs them. Keep the mechanisms: the budget script and lint, the eval runner with `--no-publish`, the hook wrapper, the installer, the one-store memory rule and the reference ladder. Replace the opinions: the style's wording, the skill set, the statusline segments, the hook budgets and the retro's cadence.
 
-The identity guard needs your own denylist. Its generator isn't published, because its sources are private. Write one that prints one extended regex per line to `~/.config/loadout-guard/denylist` (mode 0600), plus a canary line of your own, so the guard's tests can prove it works without typing a real term.
+The identity guard needs your own denylist. Its generator isn't published, because its sources are private. Write one that prints one extended regex per line to `~/.config/loadout-guard/denylist` (mode 0600), in the shape of `guard/denylist.example`, plus a canary line of your own, so the guard's tests can prove it works without typing a real term. `scripts/memory-reads` and `scripts/retro-evidence` read the same file.
 
 How each decision was reached, what it rejected, and every place the design reversed itself are in [Writing an effective harness](WRITING-AN-EFFECTIVE-HARNESS.md#11-what-i-got-wrong).
+
+## License
+
+MIT, see [LICENSE](LICENSE). Adapted third-party text is credited in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

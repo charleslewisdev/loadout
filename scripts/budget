@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Turn-0 token cost of this machine's Claude Code setup (success criterion S1).
+# Turn-0 token cost of this machine's Claude Code setup.
 #
 #   scripts/budget [--project <dir>] [--runs <n>]
 #
@@ -56,7 +56,7 @@ for v in $(compgen -e); do
   esac
 done
 
-commas() { sed ':a;s/\B[0-9]\{3\}\>/,&/;ta' <<<"$1"; }
+commas() { perl -pe '1 while s/^(-?\d+)(\d{3})/$1,$2/' <<<"$1"; }
 tilde() { printf '%s' "${1/#"$HOME"/\~}"; }
 
 # measure <label> <dir> <env assignment or ''> [flags]: runs in parallel and

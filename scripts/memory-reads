@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# How often sessions read their auto-memory (success criterion S4).
+# How often sessions read their auto-memory.
 #
 #   scripts/memory-reads [days]            default 14
 #   scripts/memory-reads --unread <days>   memory files no session read in <days>

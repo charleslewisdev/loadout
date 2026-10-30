@@ -1,1 +1,0 @@
-../fixtures/python-service.sh

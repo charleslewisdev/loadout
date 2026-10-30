@@ -1,0 +1,1 @@
+../../../loadout/evals/fixtures/cli-app.sh

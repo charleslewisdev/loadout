@@ -21,6 +21,7 @@
 # GUARD_DENYLIST            denylist path (default ~/.config/loadout-guard/denylist)
 # GUARD_REQUIRE_DENYLIST=1  a missing denylist is a finding, not a skipped check
 set -euo pipefail
+((BASH_VERSINFO[0] >= 5)) || { echo "guard: bash 5 or newer is required; this is $BASH_VERSION" >&2; exit 2; }
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$(cd "$(dirname "$0")/.." && pwd)
 allowed="$root/guard/allowed-emails"

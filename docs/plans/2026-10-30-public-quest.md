@@ -57,7 +57,7 @@ Commit: `docs: add the working-in-public rules for this repo`
 Files: modify `retros/2026-09-21.md` (lines 30 to 31)
 
 Test first: owner step: add the two terms to the guard's private sources and regenerate the denylist. Then `GUARD_REQUIRE_DENYLIST=1 guard/scan --path retros` exits 1 on that file.
-Change: replace the two names with counts, as `harness-retro/SKILL.md:50` requires.
+Change: replace the two names with counts, as the retro skill requires.
 Run: the same scan exits 0. `guard/scan --all` will still report the old commits; that is the history decision below, not a failure of this task.
 
 Commit: `docs: keep the first retro to counts`
@@ -94,23 +94,7 @@ Guideline: themed name first, literal meaning beside it, the first time it appea
 - **README flavor:** a one-line tagline; "What it costs, measured" becomes "Encumbrance: what it costs, measured"; the skill list becomes an inventory table; retros become save points. Keep every anchor the `readme-s6` eval and links use, or update them in the same change.
 - **Crystal Bridge as companion:** a short README section naming it, linking https://github.com/crystal-bridge/crystal-bridge, and documenting `CRYSTAL_SESSION` as a generic seam (a host that sends its own notifications sets it). Crystal Bridge itself must never depend on loadout.
 - **Ceremonial output:** `harness-status` renders as a character sheet (the same numbers, labelled stats); the retro calls itself a save point; papercut entries read as a quest log. Covered by the `humor` and smoke evals.
-- **Skill renames (proposal, owner to pick):** verb first, so each name still says what it does. Descriptions stay plain, so triggering and the slash menu stay usable. None reuses a Crystal Bridge term (Quest, Side Quest, Recruit, Chronicle, Inventory), and Crystal Bridge's Inventory panel will list them as `loadout:<name>`.
-
-  | Now | Proposed | What it does |
-  | --- | --- | --- |
-  | `code-debug` | `track-bug` | reproduce, then test one hypothesis at a time |
-  | `code-review` | `party-review` | a party of reviewer subagents, each finding verified |
-  | `code-verify` | `appraise-work` | run tests, lint and build before claiming done |
-  | `git-pr` | `turn-in-pr` | branch, commit and PR conventions |
-  | `plan-brainstorm` | `choose-path` | settle an open design, one question at a time |
-  | `plan-write` | `draw-map` | write the step-by-step plan |
-  | `plan-run` | `follow-map` | execute a plan task by task |
-  | `harness-status` | `check-stats` | the measured state, as a character sheet |
-  | `harness-retro` | `camp-retro` | the periodic retro and its pull request |
-  | `harness-papercut` | `mend-gear` | log one annoyance, propose the smallest fix |
-  | `write-as-me` | `scribe-as-me` | draft text published under the owner's name |
-
-  Cost of the rename: eval `case.yaml` files, cross-references between skills, README, the long-form guide, all change in the same PR, and the smoke evals re-run after it. Usage history restarts: `retro-evidence` reads `skillUsage` from `~/.claude.json`, keyed by skill name.
+- **Skill renames (done in #12):** names lead with their subject so the menu groups them: `bug-hunt`, `gear-mend`, `gear-respec`, `gear-stats`, `map-draw`, `map-follow`, `map-scout`, `pr-turn-in`, `review-party`, `scribe-as-me`. `code-verify` was retired.
 - **Labels:** `main-quest`, `side-quest`, `papercut` on the issues themselves.
 
 ## Phase 3: side quests

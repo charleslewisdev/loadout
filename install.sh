@@ -7,15 +7,20 @@
 # profiles/<profile>.json over it with `jq -s '.[0] * .[1]'`: profile keys win and
 # every other key is kept, except the marketplace source, which is replaced whole.
 # "$HOME" in a profile string becomes this machine's home.
+# The marketplace source comes from this checkout's origin remote, so a fork
+# installs from the fork: a GitHub origin becomes a github source, anything else
+# a git source. The profile sets only its ref.
 # It also sets LOADOUT_REPO to this checkout, where the harness skills open PRs.
 # A second run leaves settings.json byte-identical. Unless --no-register, it adds
 # the loadout marketplace (again, when its source or ref changed) and installs or
-# updates the plugin.
+# updates every @loadout plugin the profile enables.
 # --ref tracks another branch than the profile's, to run an unmerged branch.
-#
-# The marketplace source names the author's GitHub account, so run this only on
-# machines where that tie is acceptable.
 set -euo pipefail
+
+((BASH_VERSINFO[0] >= 5)) || { echo "install: loadout needs bash 5 or newer; this is $BASH_VERSION (on macOS: brew install bash)" >&2; exit 2; }
+for tool in git jq perl; do
+  command -v "$tool" >/dev/null || { echo "install: $tool is required" >&2; exit 2; }
+done
 
 usage() { awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" >&2; exit 2; }
 
@@ -40,8 +45,15 @@ mkdir -p "$HOME/.claude/backups"
 [[ -f $settings ]] || echo '{}' >"$settings"
 cp -p "$settings" "$(mktemp "$HOME/.claude/backups/settings.json.$(date +%Y%m%dT%H%M%S).XXXX")"
 
-wanted=$(jq --arg home "$HOME" --arg ref "$ref" --arg repo "$here" '
+origin=$(git -C "$here" remote get-url origin 2>/dev/null) ||
+  { echo "install: this checkout has no origin remote to install from" >&2; exit 2; }
+gh_repo=$(sed -nE 's#^(https://([^/@]*@)?github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)$#\3#p' <<<"$origin")
+gh_repo=${gh_repo%.git}
+wanted=$(jq --arg home "$HOME" --arg ref "$ref" --arg repo "$here" --arg origin "$origin" --arg gh "$gh_repo" '
   walk(if type == "string" then gsub("\\$HOME"; $home) else . end)
+  | .extraKnownMarketplaces.loadout.source = (
+      (if $gh != "" then {source: "github", repo: $gh} else {source: "git", url: $origin} end)
+      + {ref: (.extraKnownMarketplaces.loadout.source.ref // "main")})
   | if $ref != "" then .extraKnownMarketplaces.loadout.source.ref = $ref else . end
   | .env.LOADOUT_REPO = $repo' "$src")
 # The marketplace source is replaced whole: merged key by key, a git source's url
@@ -55,6 +67,7 @@ else
 fi
 
 ((register)) || exit 0
+command -v claude >/dev/null || { echo "install: settings are merged, but the claude CLI is required to register the plugins" >&2; exit 2; }
 kind=$(jq -r '.extraKnownMarketplaces.loadout.source.source' <<<"$wanted")
 url=$(jq -r '.extraKnownMarketplaces.loadout.source | .url // .repo' <<<"$wanted")
 want_ref=$(jq -r '.extraKnownMarketplaces.loadout.source.ref // empty' <<<"$wanted")
@@ -68,8 +81,13 @@ if ! claude plugin marketplace list --json |
     any(.[]; .name == "loadout" and .source == $kind and ((.url // .repo) == $url) and ((.ref // "") == $ref))' >/dev/null; then
   claude plugin marketplace add "$url${want_ref:+#$want_ref}"
 fi
-if claude plugin list --json | jq -e 'any(.[]; .id == "loadout@loadout")' >/dev/null; then
-  claude plugin update loadout@loadout
-else
-  claude plugin install loadout@loadout
-fi
+# A profile can enable a plugin added since this marketplace clone last updated.
+claude plugin marketplace update loadout
+installed=$(claude plugin list --json)
+for id in $(jq -r '.enabledPlugins // {} | to_entries[] | select(.value == true and (.key | endswith("@loadout"))) | .key' <<<"$wanted"); do
+  if jq -e --arg id "$id" 'any(.[]; .id == $id)' >/dev/null <<<"$installed"; then
+    claude plugin update "$id"
+  else
+    claude plugin install "$id"
+  fi
+done

@@ -1,0 +1,58 @@
+---
+name: review-party
+description: "Reviews a change as a team: runs checks and the app, sends independent reviewers, verifies each finding. Use on your own multi-file work before calling it done, before a PR, or when asked."
+---
+
+# Review a change as a team
+
+Four stages: run the checks, send independent reviewers, verify every finding, report. Post nothing to a pull request or issue until the author says so.
+
+## 0. Scope
+
+Find what is under review: a branch against its base (`git merge-base`), a pull request (`gh pr diff`), or the working tree. Note the changed files, the base commit, and every CLAUDE.md that applies: the root one and those in directories the change touches.
+
+## 1. Run the checks
+
+Run what the project uses: tests, lint, typecheck, build. Find them in CLAUDE.md, the README, package scripts, the Makefile or CI configuration. Record each command and its result; a failure here is a finding. If a check cannot run, say which and why; do not guess its result.
+
+When the change touches UI, start the app with the built-in `run` skill and look at each changed screen in Claude in Chrome. Note what differs from what the change intends.
+
+## 2. Independent reviewers
+
+Start one fresh subagent per reviewer below, all in parallel, never a fork: a fork inherits this conversation and the output style. Give each only its brief (the file under `reviewers/` in this skill's directory), the scope from stage 0, and the check results from stage 1. No reviewer sees another's work, and none runs this skill itself.
+
+Pass each subagent the model named below in the Agent tool's `model` field. Left out, every subagent runs on this session's model, and several top-tier reviewers at once exhaust the usage limit. Opus goes where judgment decides the result; Sonnet reads and matches.
+
+Always:
+
+- `reviewers/correctness.md`, opus: bugs in the changed lines
+- `reviewers/history.md`, sonnet: the change against the history of the code it touches
+- `reviewers/project-rules.md`, sonnet: CLAUDE.md files and code comments that apply
+- `reviewers/tests.md`, sonnet: whether tests prove the change, and what fails silently
+
+When the diff calls for it:
+
+- security, opus, when the change touches input handling, authentication, secrets, file or network access, or dependencies: a subagent that runs the built-in `/security-review` and returns its findings
+- `reviewers/ux.md`, sonnet, when the change touches UI or user-facing text
+
+Each reviewer returns findings as: file and line, what is wrong, the concrete input or state that makes it fail, its evidence, and a severity from stage 4 (Blocking, Should fix, Consider).
+
+## 3. Verify every finding
+
+First merge duplicates across reviewers, keeping the strongest evidence and the highest severity. Then send the findings to verifiers with `reviewers/verifier.md`, on opus, a few findings per verifier and the verifiers in parallel. Each finding gets a score from 0 to 100 on that rubric, checked on the verifier's own evidence. Drop findings under 80, except a finding confirmed against a rule its CLAUDE.md states: the rubric puts those at 75, so keep them at 75 and above.
+
+## 4. Report
+
+Group what is left by severity:
+
+- **Blocking**: wrong behavior, data loss, security, a failing check
+- **Should fix**: a real problem on an uncommon path, or a broken project rule
+- **Consider**: a clear improvement a senior reviewer would mention
+
+For each: file and line, the failure in one sentence, and the evidence. Then list the checks from stage 1 with their results, and the reviewers that ran. If nothing survived verification, say so and name what was checked.
+
+Keep each finding's severity as its reviewer set it, or as the verifier lowered it with a reason. Add your own view after the list, never in place of it. Ask before posting anything to a pull request.
+
+## On your own work
+
+When you started this review yourself, before calling your work done: fix the Blocking and Should fix findings, run the stage 1 checks again, and report the findings with what you changed for each. Never call the work done with a Blocking finding open.

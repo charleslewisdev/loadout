@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Plants a git repository with a two-task implementation plan in the eval workspace
-# (the current directory). Each task carries its test, so plan-run can follow its
+# (the current directory). Each task carries its test, so map-follow can follow its
 # own flow: test first, make it pass, commit.
 set -euo pipefail
 git init -q -b main .

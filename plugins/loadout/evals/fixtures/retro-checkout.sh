@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plants a small loadout-like checkout for the harness-retro case: a marketplace
+# Plants a small loadout-like checkout for the gear-respec case: a marketplace
 # manifest naming loadout, a friction log with one friction logged twice, and stub
 # scripts that print fixed measurements, so the case needs no real transcripts,
 # budget runs or Claude calls. No remote.
@@ -32,8 +32,8 @@ stub retro-evidence "Retro evidence since 2026-06-23: 6 sessions read, 0 skipped
 - 2026-09-05 the formatter again rewrote a whole file in another repo without prettier config -> logged (none)
 
 ## Skill usage (uses, days since last use)
-- loadout:git-pr: 14 uses, 2 days
-- loadout:plan-run: 0 uses, 91 days
+- loadout:pr-turn-in: 14 uses, 2 days
+- loadout:map-follow: 0 uses, 91 days
 
 ## Corrections (the author redirecting the model)
 - 2026-09-05 ~-code-app: no, revert that, the formatter should not touch files in this repo

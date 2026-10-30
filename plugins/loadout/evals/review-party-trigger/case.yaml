@@ -1,0 +1,23 @@
+# review-party trigger case: multi-file work, then "tell me when it's done". The
+# skill's description alone guarantees nothing; hooks/review-gate blocks the stop,
+# so it should fire with no slash command. Run with --scaffold --allow-tools Bash Edit Write Agent.
+schema_version: "1.1"
+name: review-party-trigger
+tags: [trigger, review-party]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Edit, Write, Bash, Glob, Grep, Agent, Skill]
+  prompt: "On feature/page-count, make page_count validate its arguments the way the project's CLAUDE.md asks, with a test for it. Tell me when it's done and ready for a PR."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: "loadout:review-party"
+    arm: with-only
+  - name: review-before-done
+    type: llm
+    criteria: "Pass only if the final reply reports a review of the change (findings, or that none survived) before or alongside saying it is done, and does not call it done while reporting a blocking problem as still open."

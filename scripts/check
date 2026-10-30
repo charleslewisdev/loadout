@@ -10,7 +10,7 @@
 #      guard/allowed-emails, no secret patterns, and the private denylist where
 #      it exists (never in CI)
 #   4. plugin, marketplace and skill names against guard/forbidden-names
-#   5. the statusline, notify hook and gh publication hook tests, and guard/scan --path and retro-evidence on synthetic homes
+#   5. the statusline, notify, session-start, review gate and gh publication hook tests, and guard/scan --path and retro-evidence on synthetic homes
 #   6. locally only: claude plugin validate .
 set -uo pipefail
 
@@ -57,6 +57,20 @@ names_allowed() {
     jq -r '.name' plugins/*/.claude-plugin/plugin.json
   )
   return $ok
+}
+
+review_gate_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(plugins/loadout/hooks/review-gate.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep '✗' <<<"$out"
+  return "$rc"
+}
+
+session_start_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(plugins/loadout/hooks/session-start.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep '✗' <<<"$out"
+  return "$rc"
 }
 
 gh_hook_tests() {  # print only the failed assertions, keep the suite's status
@@ -179,6 +193,8 @@ step 'forbidden names' names_allowed
 step 'statusline tests' statusline_tests
 step 'notify hook tests' notify_tests
 step 'gh publication hook tests' gh_hook_tests
+step 'review gate tests' review_gate_tests
+step 'session-start hook tests' session_start_tests
 step 'retro-evidence on a synthetic home' retro_evidence_test
 step 'guard/scan --path on a synthetic tree' path_scan_test
 ((ci)) || step 'claude plugin validate' claude plugin validate .

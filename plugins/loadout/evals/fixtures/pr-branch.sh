@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plants a repository with one feature branch for the git-pr case. The branch's
+# Plants a repository with one feature branch for the pr-turn-in case. The branch's
 # commit messages claim tests and a fix for a missing cursor, and its diff contains
 # neither: after() still raises ValueError for a cursor that is not in the list.
 set -euo pipefail

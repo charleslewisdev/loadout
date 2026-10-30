@@ -67,7 +67,7 @@ JSON
       ;;
     session) cat <<JSON
 {"model":{"display_name":"Opus 5 (1M context)"},"effort":{"level":"high"},
- "output_style":{"name":"loadout:peer"},
+ "output_style":{"name":"bard:peer"},
  "workspace":{"current_dir":"$REPO"},
  "worktree":{"name":"fix-parser","path":"$REPO","branch":"fix-parser"},
  "context_window":{"used_percentage":41,"context_window_size":1000000},

@@ -1,0 +1,20 @@
+{
+  "extraKnownMarketplaces": {
+    "loadout": {
+      "source": {
+        "ref": "main"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "loadout@loadout": true
+  },
+  "env": {
+    "CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE": "1"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "$HOME/.claude/plugins/marketplaces/loadout/plugins/loadout/statusline/statusline.sh",
+    "padding": 0
+  }
+}

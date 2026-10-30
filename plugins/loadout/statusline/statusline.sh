@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # loadout statusline. Reads the session JSON on stdin and prints one line.
 #
-# Segments, highest priority first (ADR-13): model and effort; context meter;
+# Segments, highest priority first: model and effort; context meter;
 # branch or worktree; budget health; 5-hour limit; cold prompt cache; pull
 # request; 7-day limit; output style; line churn. When the line is wider than the
 # terminal, segments drop from the end of that list. Every field is optional, and
@@ -18,8 +18,6 @@ NOW=${CLAUDE_STATUSLINE_NOW:-$(date +%s)}
 CACHE=${LOADOUT_CACHE:-$HOME/.cache/loadout}
 WIDTH=${CLAUDE_STATUSLINE_WIDTH:-${COLUMNS:-}}
 [ -z "$WIDTH" ] && WIDTH=$( { stty size </dev/tty; } 2>/dev/null | awk '{ print $2 }')
-# Show the style name even when it is peer, until the register evals pass.
-SHOW_PEER=1
 
 # ---- palette ---------------------------------------------------------------
 if [ -n "${NO_COLOR:-}" ]; then
@@ -221,7 +219,7 @@ fi
 
 # 9. output style, without the plugin prefix
 if [ -n "$STYLE" ] && [ "$STYLE" != default ]; then
-  if [ "$SHOW_PEER" = 1 ] || [ "$STYLE" != loadout:peer ]; then segs+=("${C_DIM}${STYLE##*:}${C_RST}"); fi
+  segs+=("${C_DIM}${STYLE##*:}${C_RST}")
 fi
 
 # 10. line churn, hidden when nothing changed
