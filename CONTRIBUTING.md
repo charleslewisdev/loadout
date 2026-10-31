@@ -13,7 +13,7 @@ The hooks run the identity guard on every commit and push. Add your commit email
 ## Before a PR
 
 - Run `scripts/check`. It lints budgets, scans history, and runs the hook and statusline tests.
-- A new skill or style rule needs an eval case: see "Adding a skill" in the README. Run it with `scripts/eval`.
+- A new skill or style rule needs an eval case: see "Add a skill" in the README. Run it with `scripts/eval`.
 - Commits follow Conventional Commits. PRs need a "Feedback wanted" section, as `pr-turn-in` describes.
 
 ## Text that goes public
