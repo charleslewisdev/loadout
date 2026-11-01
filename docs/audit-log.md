@@ -175,3 +175,34 @@ Before is the After column of the previous entry, plus its total and auto-memory
 **Shared kit:** 18 of 20 items are on every machine of mine: 11 skills, 5 hooks, the statusline and the output style. `unraid` and `rust-analyzer-lsp` are chosen per machine. With the two new language servers it's 18 of 22, or 82%.
 
 **Eval results:** of 37 cases, 27 pass, 2 score below 0.80, 5 aren't trusted and 3 haven't run. See [eval-results.md](eval-results.md).
+
+## 2026-11-01: language servers
+
+**CLI:** 2.1.316, on Haiku, three usable runs per configuration.
+
+**Why:** the kit audit chose TypeScript and Python language servers, and needed their measured cost.
+
+**What changed:** `typescript-lsp` and `pyright-lsp` from the official marketplace are enabled, with `typescript`, `typescript-language-server` and `pyright` installed globally with npm. The account also dropped from 15 synced skills to 11, at no cost change.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Total at turn 0, with connectors and auto-memory | 22,105 | 22,107 |
+| Harness share, with connectors | 4,442 | 4,442 |
+| Harness share, without connectors | 2,749 | 2,750 |
+| Vendor floor | 16,972 | 16,972 |
+| Auto-memory section, outside the share | 692 | 693 |
+| Account-synced skills | 699 (15) | 699 (11) |
+| Account connectors | 1,693 | 1,693 |
+| `bard` plugin | 728 | 728 |
+| User CLAUDE.md | 643 | 643 |
+| `loadout` plugin | 469 | 469 |
+| `homelab` plugin | 73 | 73 |
+| Personal skills and the rest | 137 | 137 |
+
+The rest includes the language servers. With all three on, each measures 0 when it's the only one turned off, and the 4 tokens `rust-analyzer-lsp` showed alone moved into the rest. I didn't measure all three off together, so the servers may share that cost.
+
+**Language servers:** the TypeScript and Python servers each answered a `documentSymbol` request. The TypeScript server needs a project-level `typescript` that ships `tsserver`, which TypeScript 7 doesn't. It fails to start in a project on 7.x, in a project with none, and with only a global install. It worked on 5.9.3. Five of my eight TypeScript projects are on 5.x, and the other three get no language server until the plugin supports 7.
+
+**Shared kit:** 18 of 22 items, or 82%, are on every machine of mine: 11 skills, 5 hooks, the statusline and the output style. `unraid` and the three language servers are chosen per machine. The two new servers are enabled in a private machine profile, and `install.sh` installs only this repo's plugins, so a new machine also needs `claude plugin install` for each.
+
+**Hook p95, skill usage and eval results:** no hook or kit skill changed, so there's no new table.
