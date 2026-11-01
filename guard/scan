@@ -10,22 +10,51 @@
 #   guard/scan --path <dir>  every file under a directory, read as bytes, and every name;
 #                            archives are counted, not opened; UTF-16 is not decoded
 #
+# --all also reads author and committer names, ref names and tag messages.
+#
 # Three checks: the private denylist (never in this repo), secret patterns, and
 # emails against guard/allowed-emails, where "committer-only <email>" admits an
 # address as committer only (GitHub's merge commits). Findings name a location and
 # a denylist line number, never the matched text; a path that matches is withheld.
 # A term inside snake_case or camelCase hides from word-boundary patterns, so the
 # denylist also runs over a copy with _ read as a space and capitals split.
+# The allowlist is read from beside this script, so it can scan any repository, and
+# a missing one exits 2.
+#
+# A reviewed denylist match can be excepted in a private file beside the denylist,
+# one "<repo id><TAB><key><TAB><note>" per line. A key is a hash of the denylist
+# pattern, the repository, the file and the line's content, so an exception survives a
+# rebase, and a changed line, or the same line in another file, matches nothing. Only
+# diff, range and --all use them; text, msg, tag and --path never do, and neither do
+# secrets or emails. Scans print how many findings were excepted, and --all fails on an
+# exception of this repository that matches nothing. Run a scan with GUARD_SHOW_KEYS=1
+# to print the line to add for each finding.
 # Exit 0 clean, 1 findings, 2 error.
 #
 # GUARD_DENYLIST            denylist path (default ~/.config/loadout-guard/denylist)
+# GUARD_EXCEPTIONS          exceptions path (default: exceptions, beside the denylist)
 # GUARD_REQUIRE_DENYLIST=1  a missing denylist is a finding, not a skipped check
+# GUARD_SHOW_KEYS=1         print the exception line for each denylist finding
 set -euo pipefail
+# Bytes, not characters: in a UTF-8 locale, grep's \b doesn't hold beside an invalid
+# byte. Case folding is therefore ASCII only.
+export LC_ALL=C
 ((BASH_VERSINFO[0] >= 5)) || { echo "guard: bash 5 or newer is required; this is $BASH_VERSION" >&2; exit 2; }
 
 root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$(cd "$(dirname "$0")/.." && pwd)
-allowed="$root/guard/allowed-emails"
+allowed="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)/allowed-emails"
 deny="${GUARD_DENYLIST:-$HOME/.config/loadout-guard/denylist}"
+exceptions="${GUARD_EXCEPTIONS:-$(dirname "$deny")/exceptions}"
+# Hashed so that a private repository name is never printed. The owner and name of
+# the origin, so an SSH and an HTTPS clone agree, or the path with no origin.
+url=$(git config --get remote.origin.url 2>/dev/null) || url=''
+url=$(sed -E 's#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#' <<<"$url")
+repo=$(printf '%s' "${url:-$root}" | perl -MDigest::SHA=sha256_hex -0777 -ne 'print substr(sha256_hex($_), 0, 16)')
+# Unguessable markers, so text under scan can't end a message early.
+nonce=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
+commit_mark=$'\001'"COMMIT-$nonce "
+end_mark=$'\001'"ENDMSG-$nonce"
+use_exceptions=0
 tmp=$(mktemp -d)
 # A signal stops the children too: the long --path steps run under wait.
 kill_tree() {  # pid: the process and every descendant
@@ -92,21 +121,84 @@ else
   echo "guard: denylist missing at $(tilde "$deny"); vocabulary check skipped" >&2
 fi
 
+# One "<line number><TAB><repo><TAB><key>" per exception. A file that can't be read
+# as exceptions stops the scan, since it can't say what is excepted.
+: >"$tmp/exceptions"
+: >"$tmp/used"
+if [[ -e $exceptions ]]; then
+  real=$(readlink -f "$exceptions")
+  if [[ $real == "$(readlink -f "$root")"/* ]]; then
+    echo "guard: the exceptions file is inside the repository it would excuse" >&2
+    exit 2
+  fi
+fi
+if [[ -r $exceptions ]]; then
+  awk -F'\t' '/^(#.*|[[:space:]]*)$/ { next }
+    NF < 2 || length($2) != 64 || $2 ~ /[^0-9a-f]/ { bad = NR; exit }
+    { print NR "\t" $1 "\t" $2 }
+    END { if (bad) { print bad > "/dev/stderr"; exit 1 } }' "$exceptions" >"$tmp/exceptions" 2>"$tmp/bad" || {
+    echo "guard: line $(cat "$tmp/bad") of $(tilde "$exceptions") is not an exception" >&2
+    exit 2
+  }
+fi
+excepted=0
+
+exception_key() {  # pattern, path, file holding the raw line, NUL bytes and all
+  # Lengths first, so no path or line can shift into a neighbouring field.
+  { printf '%s:%s:%s:%s:%s:%s:' "${#1}" "$1" "${#repo}" "$repo" "${#2}" "$2"; cat "$3"; } | perl -MDigest::SHA=sha256_hex -0777 -ne 'print sha256_hex($_)'
+}
+is_excepted() {  # key: true if this repository excepts it, and marks every copy used
+  local n
+  ((use_exceptions)) || return 1
+  n=$(awk -F'\t' -v r="$repo" -v k="$1" '$2 == r && $3 == k { print $1 }' "$tmp/exceptions")
+  [[ -n $n ]] && echo "$n" >>"$tmp/used"
+}
+check_exceptions_used() {
+  local n r k
+  while IFS=$'\t' read -r n r k; do
+    [[ $r == "$repo" ]] || continue
+    grep -q -x -F -e "$n" "$tmp/used" || finding "the exception on line $n of $(tilde "$exceptions") no longer matches anything"
+  done <"$tmp/exceptions"
+}
+
 # Unified diff (optionally with commit and message markers) to two parallel
 # files: text holds each path and added line, where holds its location. A path is
 # emitted once per file unless the file is deleted, so renames (with --no-renames)
 # and empty new files are covered. Header lines count only before a file's first
 # hunk, so an added line that starts with "++ " is still content.
 records() {
-  awk -v T="$tmp/text" -v W="$tmp/where" '
+  LC_ALL=C awk -v T="$tmp/text" -v W="$tmp/where" -v C="$commit_mark" -v E="$end_mark" '
     function emit(s) { print s > T; print c ":" p ":" n > W }
     function flush() { if (pend != "") { p = pend; n = 0; emit(p) } pend = "" }
+    function unquote(s,    o, i, ch, e, v) {  # C-style quoting, as git writes unusual paths
+      o = ""
+      for (i = 1; i <= length(s); i++) {
+        ch = substr(s, i, 1)
+        if (ch != "\\") { o = o ch; continue }
+        e = substr(s, ++i, 1)
+        if (e == "t") o = o "\t"
+        else if (e == "n" || e == "r" || e == "a" || e == "b" || e == "f" || e == "v") o = o " "
+        else if (e ~ /[0-7]/) {
+          v = substr(s, i, 1) * 64 + substr(s, i + 1, 1) * 8 + substr(s, i + 2, 1); i += 2
+          o = o (v < 32 || v == 127 ? " " : sprintf("%c", v))
+        }
+        else o = o e
+      }
+      return o
+    }
+    # With --no-renames both sides name one path, so its length splits the header
+    # wherever the path itself holds " b/".
+    function header_path(s,    half) {
+      if (substr(s, 1, 1) == "\"") { half = (length(s) - 1) / 2; return unquote(substr(s, 4, half - 4)) }
+      return substr(s, 3, (length(s) - 5) / 2)
+    }
     BEGIN { c = "staged" }
-    /^\001COMMIT / { flush(); c = substr($2, 1, 10); m = 1; p = "(message)"; n = 0; next }
-    /^\001ENDMSG/  { m = 0; next }
+    index($0, C) == 1 { flush(); c = substr($0, length(C) + 1, 10); m = 1; p = "(message)"; n = 0; next }
+    $0 == E { m = 0; next }
     m { n++; emit($0); next }
-    /^diff --git / { flush(); w = 0; pend = $0; sub(/^diff --git a\/.* b\//, "", pend); p = pend; next }
-    /^diff --(cc|combined) / { flush(); w = 0; pend = $0; sub(/^diff --(cc|combined) /, "", pend); p = pend; next }
+    /^diff --git / { flush(); w = 0; pend = header_path(substr($0, 12)); p = pend; next }
+    /^diff --(cc|combined) / { flush(); w = 0; pend = $0; sub(/^diff --(cc|combined) /, "", pend)
+                               if (substr(pend, 1, 1) == "\"") pend = unquote(substr(pend, 2, length(pend) - 2)); p = pend; next }
     !w && /^deleted file mode/ { pend = ""; next }
     !w && /^--- / { next }
     !w && /^\+\+\+ / { if ($0 == "+++ /dev/null") pend = ""; else flush(); next }
@@ -115,6 +207,13 @@ records() {
     w && substr($0, 1, w) ~ /\+/ && substr($0, 1, w) !~ /-/ { emit(substr($0, w + 1)); n++; next }
     END { flush() }
   '
+}
+
+raw_path() {  # line number in $tmp/where
+  local loc
+  loc=$(sed -n "${1}p" "$tmp/where")
+  loc=${loc#*:}
+  printf '%s' "${loc%:*}"
 }
 
 where() {  # line number in $tmp/where; withholds a path that matches the denylist
@@ -126,13 +225,15 @@ where() {  # line number in $tmp/where; withholds a path that matches the denyli
   path=${path%:*}
   if [[ -s $tmp/deny ]] && { grep -q -a -i -E -f "$tmp/deny" <<<"$path" || norm <<<"$path" | grep -q -a -i -E -f "$tmp/deny"; }; then
     path='(path withheld, it matches the denylist)'
+  elif grep -q -a -E -f "$tmp/secrets" <<<"$path"; then
+    path='(path withheld, it matches a secret pattern)'
   fi
   printf '%s:%s:%s' "$commit" "$path" "$line"
 }
 
 check_records() {
   [[ -s $tmp/text ]] || return 0
-  local n line i pat hit
+  local n i pat hit path key offered matched
   if [[ -s $tmp/deny ]]; then
     norm <"$tmp/text" >"$tmp/text.norm"
     hits "$tmp/deny" "$tmp/text" -i
@@ -140,13 +241,29 @@ check_records() {
     hits "$tmp/deny" "$tmp/text.norm" -i
     cut -d: -f1 "$tmp/hits" >>"$tmp/lines"
     while read -r n; do
-      line=$(sed -n "${n}p" "$tmp/text")
-      nline=$(sed -n "${n}p" "$tmp/text.norm")
-      hit='?'
+      # In files, so a NUL byte reaches the match and the hash.
+      sed -n "${n}p" "$tmp/text" >"$tmp/line"
+      sed -n "${n}p" "$tmp/text.norm" >"$tmp/nline"
+      path=$(raw_path "$n")
+      hit='?' offered='' matched=0
+      # Every pattern, not just the first: an exception for one term must not hide
+      # another term on the same line.
       while IFS=: read -r i pat; do
-        if grep -q -a -i -E -e "$pat" <<<"$line" || grep -q -a -i -E -e "$pat" <<<"$nline"; then hit=$i; break; fi
+        grep -q -a -i -E -e "$pat" "$tmp/line" || grep -q -a -i -E -e "$pat" "$tmp/nline" || continue
+        matched=1
+        key=$(exception_key "$pat" "$path" "$tmp/line")
+        is_excepted "$key" && continue
+        [[ -n $offered ]] || { hit=$i offered=$key; }
       done < <(grep -n -v -e '^[[:space:]]*$' "$deny")
-      finding "denylist line $hit matches at $(where "$n")"
+      if ((matched)) && [[ -z $offered ]]; then
+        excepted=$((excepted + 1))
+        continue
+      fi
+      if [[ ${GUARD_SHOW_KEYS:-0} == 1 && -n $offered ]] && ((use_exceptions)); then
+        finding "denylist line $hit matches at $(where "$n"), exception key: $repo"$'\t'"$offered"
+      else
+        finding "denylist line $hit matches at $(where "$n")"
+      fi
     done < <(sort -un "$tmp/lines")
   fi
   hits "$tmp/secrets" "$tmp/text"
@@ -158,22 +275,34 @@ check_records() {
 email_ok() { grep -q -i -x -F -e "$1" "$allowed"; }
 committer_ok() { email_ok "$1" || grep -q -i -x -F -e "committer-only $1" "$allowed"; }
 
+# Spelled out, so that no local git config changes what the scan sees.
+diff_flags=(--no-ext-diff --no-textconv --no-renames --no-relative --text -U0 --inter-hunk-context=0
+  --submodule=short --ignore-submodules=none --src-prefix=a/ --dst-prefix=b/)
+
 check_emails() {  # git log arguments
   local c ae ce
   while IFS=$'\t' read -r c ae ce; do
     email_ok "$ae" || finding "author email of commit ${c:0:10} is not in guard/allowed-emails"
     committer_ok "$ce" || finding "committer email of commit ${c:0:10} is not in guard/allowed-emails"
-  done < <(git log --format='%H%x09%ae%x09%ce' "$@")
+  done < <(git --no-replace-objects log --no-show-signature --format='%H%x09%ae%x09%ce' "$@")
 }
 
 log_records() {  # git log arguments
-  git log --no-color --no-ext-diff --no-renames --text -p --cc -U0 --src-prefix=a/ --dst-prefix=b/ \
-    --format='format:%x01COMMIT %H%n%B%n%x01ENDMSG' "$@" | records
+  git --no-replace-objects -c core.quotePath=false -c log.showRoot=true log --encoding=UTF-8 --no-show-signature \
+    --no-color "${diff_flags[@]}" -p --cc \
+    --format="format:%x01COMMIT-$nonce %H%n%an%n%cn%n%B%n%x01ENDMSG-$nonce" "$@" | records
 }
 
 case "${1:-}" in
+  diff | range | --all | tag)
+    [[ -r $allowed ]] || { echo "guard: $(tilde "$allowed") is missing, so emails can't be checked" >&2; exit 2; }
+    ;;
+esac
+
+case "${1:-}" in
   diff)
-    git diff --cached --no-color --no-ext-diff --no-renames --text -U0 --src-prefix=a/ --dst-prefix=b/ | records
+    use_exceptions=1
+    git -c core.quotePath=false diff --cached --no-color "${diff_flags[@]}" | records
     check_records
     for who in AUTHOR COMMITTER; do
       email=$(git var "GIT_${who}_IDENT" 2>/dev/null | sed -n 's/.*<\(.*\)>.*/\1/p') || email=''
@@ -183,24 +312,34 @@ case "${1:-}" in
   range)
     shift
     [[ $# -gt 0 ]] || { echo "usage: guard/scan range <revs>" >&2; exit 2; }
+    use_exceptions=1
     log_records "$@"
     check_records
     check_emails "$@"
     ;;
   --all)
+    use_exceptions=1
     log_records --all
     check_records
+    check_exceptions_used
     check_emails --all
+    # Ref names and tag messages, which git log doesn't show. These take no exceptions.
+    use_exceptions=0
+    { printf '%srefs\n' "$commit_mark"
+      git for-each-ref --format='%(refname)'
+      git for-each-ref --format='%(contents)' refs/tags
+      printf '\n%s\n' "$end_mark"; } | records
+    check_records
     ;;
   msg)
     [[ -r ${2:-} ]] || { echo "usage: guard/scan msg <file>" >&2; exit 2; }
     sed '/^# -* >8 -*$/,$d' "$2" | git stripspace --strip-comments >"$tmp/msg"
-    { printf '\001COMMIT message\n'; cat "$tmp/msg"; printf '\n\001ENDMSG\n'; } | records
+    { printf '%smessage\n' "$commit_mark"; cat "$tmp/msg"; printf '\n%s\n' "$end_mark"; } | records
     check_records
     ;;
   text)
     [[ -r ${2:-} ]] || { echo "usage: guard/scan text <file>" >&2; exit 2; }
-    { printf '\001COMMIT text\n'; cat "$2"; printf '\n\001ENDMSG\n'; } | records
+    { printf '%stext\n' "$commit_mark"; cat "$2"; printf '\n%s\n' "$end_mark"; } | records
     check_records
     ;;
   --path)
@@ -291,7 +430,7 @@ PERL
     ;;
   tag)
     [[ $(git cat-file -t "${2:-}" 2>/dev/null) == tag ]] || { echo "usage: guard/scan tag <tag object>" >&2; exit 2; }
-    { printf '\001COMMIT tag\n'; git cat-file tag "$2"; printf '\n\001ENDMSG\n'; } | records
+    { printf '%stag\n' "$commit_mark"; git cat-file tag "$2"; printf '\n%s\n' "$end_mark"; } | records
     check_records
     tagger=$(git cat-file tag "$2" | sed -n 's/^tagger .*<\(.*\)>.*/\1/p')
     email_ok "$tagger" || finding "the tagger email of tag object ${2:0:10} is not in guard/allowed-emails"
@@ -302,6 +441,10 @@ PERL
     ;;
 esac
 
+if ((excepted)); then
+  ((excepted == 1)) && noun=finding || noun=findings
+  echo "guard: $excepted $noun excepted" >&2
+fi
 if [[ -s $findings ]]; then
   cat "$findings" >&2
   exit 1

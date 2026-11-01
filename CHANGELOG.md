@@ -2,8 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- `guard/scan` no longer misses a term after a forged end marker, in a path holding ` b/`, or in a path git quotes, and no longer prints a quoted path that matches.
+- `guard/scan` no longer depends on the locale or on local git config, reads author and committer names, ref names and tag messages, and withholds a path that matches a secret pattern.
+- `guard/scan` reads its allowlist from beside the script, so it can scan another repo, and exits 2 if the list is missing.
+
 ### Added
 
+- Reviewed exceptions for `guard/scan`, kept beside the private denylist and keyed on content.
 - Prose lint with Vale in `scripts/check`, where Vale is installed, with rules in `.vale/styles`.
 
 ## 0.9.0, 2026-11-01

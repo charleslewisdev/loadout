@@ -273,6 +273,19 @@ Building it taught me a few things:
 
 The last check stays human, because the guard matches strings and what counts as private is a judgment. Before a repo goes public, a person reads a full-history scan that also covers what `guard/scan --all` never sees: PR titles, bodies, and comments, CI logs, and the `refs/pull/*` heads GitHub keeps after a squash merge, which go public with the repo.
 
+To scan another repo, run the guard from your loadout checkout while inside that repo:
+
+```
+GUARD_REQUIRE_DENYLIST=1 ~/code/loadout/guard/scan --all
+```
+
+It reads the allowlist from beside the script, and exits 2 if the file is missing, because a scan that can't load its list hasn't checked anything.
+
+A clean scan has to stay reachable, or people learn to ignore the guard. Two tools keep it that way:
+
+- **A stricter pattern** for a term that's also an everyday word. `bramble[-/.]` finds a project name in `bramble-api` and leaves a hedge alone. Reach for this first, because it needs no upkeep.
+- **A reviewed exception** for one harmless match already in history. `GUARD_SHOW_KEYS=1` prints the line to add to `exceptions`, beside the denylist. It's a hash of the pattern, repo, file and line content, so it survives a rebase and holds no private text. Only commits and history take exceptions: text headed straight for GitHub never does. A changed line stops matching, each scan prints how many findings were excepted, and `--all` fails on an exception that no longer matches anything. Secrets and emails can't be excepted.
+
 To leave a machine clean, run `guard/scan --path ~`. It reads every file under a directory as bytes, checks every name, and reports denylist line numbers only. It can't see inside archives or compressed documents, and it doesn't decode UTF-16, which some app databases use. Uninstalling isn't enough. Private terms hide where no uninstall reaches: the Docker build cache, editor and chat-app state, shell history, a pip-installed client, Claude Code's own config backups, and search queries a memory server logs in each memory's metadata. Read the findings for lines that can only mean a private term first, because denylist lines that are also ordinary words make most of the noise.
 
 ## 11. Share it with a team
