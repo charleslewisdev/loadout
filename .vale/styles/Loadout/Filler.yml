@@ -1,0 +1,11 @@
+extends: existence
+message: "Cut the filler: '%s'."
+level: error
+ignorecase: true
+tokens:
+  - load-bearing
+  - genuinely
+  - nuanced
+  - the real question
+  - it is worth noting
+  - it's worth noting

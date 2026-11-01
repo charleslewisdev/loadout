@@ -11,7 +11,8 @@
 #      it exists (never in CI)
 #   4. plugin, marketplace and skill names against guard/forbidden-names
 #   5. the statusline, notify, session-start, review gate and gh publication hook tests, and guard/scan --path and retro-evidence on synthetic homes
-#   6. scripts/budget and scripts/eval against a stub claude
+#   6. scripts/budget and scripts/eval against a stub claude, and vale on published
+#      docs where it is installed
 #   7. every retro since the audit log began has an entry in docs/audit-log.md
 #   8. locally only: claude plugin validate .
 set -uo pipefail
@@ -107,6 +108,21 @@ eval_tests() {  # print only the failed assertions, keep the suite's status
   local out rc=0
   out=$(scripts/eval.test.sh 2>&1) || rc=$?
   ((rc == 0)) || grep '✗' <<<"$out"
+  return "$rc"
+}
+
+# Published docs against .vale/styles. A planted em-dash must fail first, so a broken
+# config can't pass as clean. CI has no vale, so this is local for now.
+prose_lint() {
+  command -v vale >/dev/null || { echo "vale isn't installed, skipped"; return 0; }
+  local rc=0
+  if printf '# Sample\n\nThis fails \xe2\x80\x94 on purpose.\n' |
+    vale --config .vale.ini --ext=.md --output=line >/dev/null 2>&1; then
+    echo "vale passed a planted em-dash, so its config is broken"
+    return 1
+  fi
+  vale --config .vale.ini --no-wrap --output=line README.md WRITING-AN-EFFECTIVE-HARNESS.md \
+    CONTRIBUTING.md SECURITY.md docs/audit-log.md docs/eval-results.md || rc=$?
   return "$rc"
 }
 
@@ -232,6 +248,7 @@ step 'guard/scan --path on a synthetic tree' path_scan_test
 step 'budget script tests' budget_tests
 step 'eval wrapper tests' eval_tests
 step 'audit log covers every retro' audit_log_current
+step 'prose lint' prose_lint
 ((ci)) || step 'claude plugin validate' claude plugin validate .
 
 if ((${#failed[@]})); then

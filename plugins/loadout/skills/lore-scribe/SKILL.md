@@ -49,7 +49,7 @@ A README is a fifth thing: a filter. See rule 3.
 
 ## 4. Style
 
-Read `references/style.md` in this skill's directory before you write more than a paragraph. It covers wording, headings, lists, links and code.
+Read `references/style.md` in this skill's directory before you write more than a paragraph. It covers wording, headings, lists, links and code. `scripts/check` lints what a tool can catch with [Vale](https://vale.sh/) where it's installed, so spend your attention on what it can't.
 
 ## 5. Test it on a fresh reader
 

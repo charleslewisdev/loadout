@@ -1,0 +1,9 @@
+extends: existence
+message: "'%s' assumes it's easy for the reader. Cut it."
+level: warning
+ignorecase: true
+tokens:
+  - simply
+  - easily
+  - obviously
+  - note that

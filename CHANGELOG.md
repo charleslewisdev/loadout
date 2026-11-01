@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Prose lint with Vale in `scripts/check`, where Vale is installed, with rules in `.vale/styles`.
+
 ## 0.9.0, 2026-11-01
 
 ### Fixed
