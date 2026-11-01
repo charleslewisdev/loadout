@@ -9,10 +9,23 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           # The PR head, not GitHub's synthetic merge commit, whose author fails the email check.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install Vale, verified by checksum
+        run: |
+          version=3.25.1
+          sum=4bf5c5176b682b1da0830f471584d3494f1c2e27ee3029e1ad6f6661d4962182
+          file=vale_${version}_Linux_64-bit.tar.gz
+          curl -fsSL -o "$RUNNER_TEMP/$file" "https://github.com/errata-ai/vale/releases/download/v$version/$file"
+          echo "$sum  $RUNNER_TEMP/$file" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$file" -C "$RUNNER_TEMP" vale
+          echo "$RUNNER_TEMP" >>"$GITHUB_PATH"
+      - name: Install reuse
+        run: pipx install reuse==5.0.2
+      - name: License check
+        run: reuse lint
       - name: Checks (no Claude credentials, no denylist)
         run: scripts/check --ci

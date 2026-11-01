@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- CI pins its action to a commit, runs Vale and `reuse lint`, and verifies Vale by checksum.
+
 ### Fixed
 
 - `guard/scan` no longer misses a term after a forged end marker, in a path holding ` b/`, or in a path git quotes, and no longer prints a quoted path that matches.
@@ -10,6 +14,8 @@
 
 ### Added
 
+- `docs/public-repo-standard.md`, one checklist for every public repo, with `scripts/check` enforcing the items a script can check.
+- A code of conduct, issue and pull request templates, Dependabot for actions, and REUSE licensing.
 - Reviewed exceptions for `guard/scan`, kept beside the private denylist and keyed on content.
 - Prose lint with Vale in `scripts/check`, where Vale is installed, with rules in `.vale/styles`.
 

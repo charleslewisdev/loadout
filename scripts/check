@@ -14,7 +14,8 @@
 #   6. scripts/budget and scripts/eval against a stub claude, and vale on published
 #      docs where it is installed
 #   7. every retro since the audit log began has an entry in docs/audit-log.md
-#   8. locally only: claude plugin validate .
+#   8. the machine-checkable items of docs/public-repo-standard.md
+#   9. locally only: claude plugin validate .
 set -uo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -119,7 +120,7 @@ eval_tests() {  # print only the failed assertions, keep the suite's status
 }
 
 # Published docs against .vale/styles. A planted em-dash must fail first, so a broken
-# config can't pass as clean. CI has no vale, so this is local for now.
+# config can't pass as clean. CI installs vale; a fork without it skips this.
 prose_lint() {
   command -v vale >/dev/null || { echo "vale isn't installed, skipped"; return 0; }
   local rc=0
@@ -129,8 +130,65 @@ prose_lint() {
     return 1
   fi
   vale --config .vale.ini --no-wrap --output=line README.md WRITING-AN-EFFECTIVE-HARNESS.md \
-    CONTRIBUTING.md SECURITY.md docs/audit-log.md docs/eval-results.md || rc=$?
+    CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md docs/audit-log.md docs/eval-results.md \
+    docs/public-repo-standard.md || rc=$?
   return "$rc"
+}
+
+# docs/public-repo-standard.md, the items a script can check. It takes a root, so a
+# test can point it at a broken copy.
+repo_standard() {
+  local r=${1:-.} ok=0 f line
+  for f in LICENSE THIRD_PARTY_NOTICES.md REUSE.toml README.md CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md \
+    .github/dependabot.yml .github/pull_request_template.md .github/ISSUE_TEMPLATE/bug.yml .github/ISSUE_TEMPLATE/feature.yml; do
+    [[ -s $r/$f ]] || { echo "$f is missing"; ok=1; }
+  done
+  [[ -n $(find "$r/LICENSES" -name '*.txt' -print -quit 2>/dev/null) ]] || { echo "LICENSES/ holds no license text"; ok=1; }
+  grep -q '^[[:space:]-]*package-ecosystem: github-actions' "$r/.github/dependabot.yml" 2>/dev/null ||
+    { echo "Dependabot doesn't watch github-actions"; ok=1; }
+  local workflows=() actions=() value
+  mapfile -t workflows < <(find "$r/.github/workflows" -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null | sort)
+  mapfile -t actions < <(find "$r/.github/actions" -type f \( -name 'action.yml' -o -name 'action.yaml' \) 2>/dev/null | sort)
+  ((${#workflows[@]})) || { echo "no workflow in .github/workflows"; ok=1; }
+  for f in "${workflows[@]}"; do
+    grep -q '^permissions:' "$f" || { echo "${f#"$r"/} sets no permissions"; ok=1; }
+    if grep -q 'write-all' "$f"; then echo "${f#"$r"/} asks for write-all"; ok=1; fi
+  done
+  for f in "${workflows[@]}" "${actions[@]}"; do
+    # The value alone, without a trailing comment or quotes, so a comment can't pass it.
+    while IFS= read -r value; do
+      [[ $value == ./* ]] && continue
+      [[ $value =~ @[0-9a-f]{40}$ ]] || { echo "${f#"$r"/} has an action not pinned to a commit: $value"; ok=1; }
+    done < <(sed -nE "s/^[[:space:]-]*['\"]?uses['\"]?[[:space:]]*:[[:space:]]*['\"]?([^'\" #]+).*/\1/p" "$f")
+  done
+  return "$ok"
+}
+
+repo_standard_negative() {  # the check must fail on a repo that breaks the standard
+  local t
+  t=$(mktemp -d)
+  mkdir -p "$t/.github/workflows"
+  printf 'on: push\njobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n' >"$t/.github/workflows/ci.yml"
+  local out rc=0
+  out=$(repo_standard "$t") || rc=$?
+  rm -rf "$t"
+  ((rc == 1)) || { echo "repo_standard passed a broken repo"; return 1; }
+  for w in 'CODE_OF_CONDUCT.md is missing' 'sets no permissions' 'not pinned to a commit'; do
+    grep -q "$w" <<<"$out" || { echo "repo_standard missed: $w"; return 1; }
+  done
+  t=$(mktemp -d)
+  mkdir -p "$t/.github/workflows" "$t/.github/actions/x"
+  printf 'permissions: {}\njobs:\n  a:\n    steps:\n      - uses: a/b@v4 # was @%040d\n' 0 >"$t/.github/workflows/w.yaml"
+  printf 'runs:\n  steps:\n    - uses: c/d@v1\n' >"$t/.github/actions/x/action.yml"
+  out=$(repo_standard "$t") || true
+  rm -rf "$t"
+  for w in 'w.yaml has an action' 'action.yml has an action'; do
+    grep -q "$w" <<<"$out" || { echo "repo_standard missed: $w"; return 1; }
+  done
+  t=$(mktemp -d)
+  out=$(repo_standard "$t") || true
+  rm -rf "$t"
+  grep -q 'no workflow' <<<"$out" || { echo "repo_standard passed a repo with no workflow"; return 1; }
 }
 
 # A retro must not depend on someone remembering the log, so a retro with no entry
@@ -257,6 +315,8 @@ step 'budget script tests' budget_tests
 step 'eval wrapper tests' eval_tests
 step 'audit log covers every retro' audit_log_current
 step 'prose lint' prose_lint
+step 'public repo standard' repo_standard
+step 'public repo standard catches a broken repo' repo_standard_negative
 ((ci)) || step 'claude plugin validate' claude plugin validate .
 
 if ((${#failed[@]})); then

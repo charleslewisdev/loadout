@@ -1,0 +1,30 @@
+# Which license covers which paths, machine-readable (https://reuse.software).
+version = 1
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Charles Lewis"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [
+  "plugins/loadout/skills/bug-hunt/SKILL.md",
+  "plugins/loadout/skills/pr-turn-in/SKILL.md",
+  "plugins/bard/output-styles/peer.md",
+]
+precedence = "override"
+SPDX-FileCopyrightText = ["2026 Charles Lewis", "2025 Jesse Vincent"]
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "plugins/loadout/skills/lore-scribe/references/style.md"
+precedence = "override"
+SPDX-FileCopyrightText = ["2026 Charles Lewis", "Google LLC"]
+SPDX-License-Identifier = "CC-BY-4.0"
+
+[[annotations]]
+path = "plugins/loadout/skills/review-party/reviewers/verifier.md"
+precedence = "override"
+SPDX-FileCopyrightText = ["2026 Charles Lewis", "Anthropic, PBC"]
+SPDX-License-Identifier = "MIT AND Apache-2.0"

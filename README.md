@@ -141,6 +141,8 @@ A shared harness fails the same way a personal one does, only bigger, because ev
 
 [Writing an effective harness](WRITING-AN-EFFECTIVE-HARNESS.md) is the long version: why each piece works the way it does, what I rejected, and [how I got here](WRITING-AN-EFFECTIVE-HARNESS.md#12-how-i-got-here), including everything I got wrong along the way.
 
+The [public repo standard](docs/public-repo-standard.md) is the checklist every public repo here meets.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Adapted third-party text is credited in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -10,7 +10,7 @@ Adapted, reworded and shortened:
 
 - `plugins/loadout/skills/bug-hunt/SKILL.md`: the stop-after-three-failed-fixes rule and the "signs you skipped a step" list.
 - `plugins/loadout/skills/pr-turn-in/SKILL.md`: the four choices offered when finishing a branch.
-- The verification rule in `plugins/loadout/output-styles/peer.md`, first written as a verification skill since retired.
+- The verification rule in `plugins/bard/output-styles/peer.md`, first written as a verification skill since retired.
 
 MIT License text: https://github.com/obra/superpowers/blob/main/LICENSE
 
