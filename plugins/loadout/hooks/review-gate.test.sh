@@ -106,4 +106,22 @@ fresh; git init -q --bare "$t/up.git"; "${g[@]}" remote add origin "$t/up.git"; 
 "${g[@]}" switch -q -c feature; echo x >>"$r/a.py"; echo x >>"$r/b.py"; "${g[@]}" add .; "${g[@]}" commit -q -m "feat: work"; "${g[@]}" push -q -u origin feature
 edit "$r/a.py"; edit "$r/b.py"; run
 check "work that was committed and pushed still blocks" blocked
+
+# Prose docs. These run last because earlier cases share a working tree.
+fresh; mkdir -p "$r/docs"; edit "$r/README.md"; edit "$r/docs/guide.md"; echo x >"$r/README.md"; echo x >"$r/docs/guide.md"; run
+check "two prose docs pass" silent
+fresh; edit "$r/README.md"; edit "$r/a.py"; echo x >"$r/README.md"; echo x >>"$r/a.py"; run
+check "a doc beside code still counts" blocked
+fresh; mkdir -p "$r/s/skills/y"; edit "$r/README.md"; edit "$r/s/skills/y/SKILL.md"; echo x >"$r/README.md"; echo x >"$r/s/skills/y/SKILL.md"; run
+check "a skill is code, not prose" blocked
+fresh; edit "$r/README.md"; edit "$r/CLAUDE.md"; echo x >"$r/README.md"; echo x >"$r/CLAUDE.md"; run
+check "CLAUDE.md is code, not prose" blocked
+
+fresh; edit "$r/requirements.txt"; edit "$r/constraints.txt"; echo x >"$r/requirements.txt"; echo x >"$r/constraints.txt"; run
+check "a .txt file isn't prose" blocked
+fresh; edit "$r/README.md"; edit "$r/guide.md"; echo x >"$r/README.md"; echo x >"$r/guide.md"; echo x >>"$r/a.py"; run
+check "code a command changed unseen still counts" blocked
+fresh; edit "$r/README.md"; edit "$r/CLAUDE.local.md"; echo x >"$r/README.md"; echo x >"$r/CLAUDE.local.md"; run
+check "CLAUDE.local.md is code, not prose" blocked
+
 exit $fail

@@ -1,0 +1,57 @@
+# lore-scribe on a README that buries the point under history and counts. The
+# graders come from the owner's real feedback on this repo's README: it lost readers
+# at the third paragraph, where it started counting things. Run with --scaffold
+# --allow-tools Edit Write.
+schema_version: "1.1"
+name: lore-scribe-readme
+tags: [lore-scribe]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 16
+  timeout_seconds: 300
+  allowed_tools: [Skill, Read, Glob, Grep, Edit, Write]
+  prompt: "Rewrite README.md for people who have never heard of this project. Keep every fact a reader might need somewhere in the repo."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: lore-scribe
+    arm: with-only
+  - name: opens-with-the-point
+    type: llm
+    focus:
+      source: file
+      path: README.md
+    criteria: "Pass only if the first paragraph after the title says what Tidemark does and who it is for, before any history, architecture or numbers. Fail if it opens with project history or statistics."
+  - name: no-counts-that-drift
+    type: llm
+    focus:
+      source: file
+      path: README.md
+    criteria: "Fail if the file states any of these: 47 commands, 212 tests, 18 contributors, 1,340 stars, 8.3 seconds, or October 2026. Pass if none of them appears."
+  - name: shows-how-to-start
+    type: llm
+    focus:
+      source: file
+      path: README.md
+    criteria: "Pass only if the file gives the exact install command go install example.com/tidemark@latest."
+  - name: keeps-every-command
+    type: llm
+    focus:
+      source: file
+      path: docs/guide.md
+    criteria: "This grader sees only docs/guide.md. Pass if it documents tidemark restore and tidemark prune. Fail if either is missing here, unless the page says the full command list lives in the README."
+  - name: depth-moved-to-the-guide
+    type: llm
+    focus:
+      source: file
+      path: docs/guide.md
+    criteria: "Pass only if this guide now holds the architecture detail (the worker pool, BLAKE3 hashing, the SQLite index and the buckets). Fail if it is still only the two original lines."
+  - name: readme-links-the-guide
+    type: llm
+    focus:
+      source: file
+      path: README.md
+    criteria: "Pass only if the file contains a Markdown link to docs/guide.md."

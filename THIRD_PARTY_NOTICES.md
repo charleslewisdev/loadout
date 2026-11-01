@@ -14,6 +14,14 @@ Adapted, reworded and shortened:
 
 MIT License text: https://github.com/obra/superpowers/blob/main/LICENSE
 
+## Google developer documentation style guide
+
+https://developers.google.com/style/, Creative Commons Attribution 4.0 License, Copyright Google LLC.
+
+Adapted, reworded and shortened: `plugins/loadout/skills/lore-scribe/references/style.md`. Google doesn't endorse this adaptation.
+
+License text: https://creativecommons.org/licenses/by/4.0/
+
 ## claude-plugins-official
 
 https://github.com/anthropics/claude-plugins-official, Apache License 2.0, Copyright Anthropic, PBC.

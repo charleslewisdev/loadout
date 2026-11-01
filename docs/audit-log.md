@@ -51,7 +51,7 @@ Repeated runs agreed within 2 tokens, with no runs discarded. The share is over 
 | `bug-hunt` | 1 |
 | `gear-mend`, `gear-respec`, `scribe-as-me` | 0 |
 
-**Eval results:** of 31 cases, 17 pass, 6 score below 0.80, 5 aren't trusted because Bash fails in the eval sandbox, and 3 haven't run. See [eval-results.md](eval-results.md).
+**Eval results:** of 31 cases, 21 pass, 2 score below 0.80, 5 aren't trusted because Bash fails in the eval sandbox, and 3 haven't run. See [eval-results.md](eval-results.md). This entry first said 17 and 6. That run left out `--allow-tools Edit Write`, which failed four cases that needed those tools, and the numbers here are from the rerun.
 
 ## 2026-11-01: first trim
 

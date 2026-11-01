@@ -8,7 +8,7 @@
     {
       "name": "loadout",
       "source": "./plugins/loadout",
-      "description": "A measured Claude Code harness: skills for planning, debugging, review and PRs, harness retros, hooks and a statusline."
+      "description": "A measured Claude Code harness: skills for planning, debugging, review, docs and PRs, harness retros, hooks and a statusline."
     },
     {
       "name": "bard",

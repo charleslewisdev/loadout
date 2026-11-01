@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0, 2026-11-01
 
 ### Fixed
 
@@ -10,10 +10,13 @@
 ### Changed
 
 - `scripts/budget` reports connectors, synced skills, each plugin and the user CLAUDE.md from real on and off runs, replacing the character estimate. The headline share now includes connectors, so it can fail where it used to pass.
+- `review-gate` skips work that's nothing but prose docs, and still counts skills, rules, plans and instruction files.
+- `scribe-as-me` covers text published under your name, and READMEs moved to `lore-scribe`.
 - The guide explains what a claude.ai account adds to each session, how to trim it per machine, and what `name-only` costs.
 
 ### Added
 
+- `lore-scribe`, one documentation skill with per-repo voices, which loads when Claude works on Markdown or `docs/` files. A repo picks a voice with a `Voice:` line in its CLAUDE.md.
 - `docs/audit-log.md`, one entry per harness audit, which `gear-respec` adds to and `scripts/check` enforces.
 - `docs/eval-results.md`, written by `scripts/eval-summary`.
 

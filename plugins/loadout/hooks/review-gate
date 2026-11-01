@@ -11,7 +11,11 @@
 # still differ from the default branch, and aren't ignored. Edits in
 # the same turn as a review are that review's fixes and don't count. Before any
 # review, a mutating Bash command counts every file that differs, since the
-# transcript doesn't name them.
+# transcript doesn't name them. Work that is nothing but prose docs passes: a README
+# and a guide don't need a team of reviewers, and lore-scribe tests them on a fresh
+# reader. That test reads everything that differs, not just the files the transcript
+# names, because a command can change code unseen. Markdown that changes behavior
+# counts as code: skills, rules, agents, plans and instruction files.
 # LOADOUT_REVIEW_GATE=0 turns the gate off. LOADOUT_CACHE moves the markers.
 set -uo pipefail
 export LC_ALL=C
@@ -81,10 +85,11 @@ differs=$({
   git -C "$top" status --porcelain -z -uall --no-renames 2>/dev/null | tr '\0' '\n' | cut -c4-
   [[ -n $base ]] && git -C "$top" -c core.quotePath=false diff --name-only "$base" HEAD 2>/dev/null
 } | sed '/^$/d' | sort -u)
-touched=$(tail -n +2 <<<"$state" | sed '/^$/d' |
+changed_files=$(tail -n +2 <<<"$state" | sed '/^$/d' |
   perl -MCwd=abs_path -MFile::Basename -lne 'my $d = abs_path(dirname($_)); print defined $d ? "$d/" . basename($_) : $_' |
   grep -F "$top/" | sed "s#^$top/##" | sort -u | comm -12 - <(printf '%s\n' "$differs") |
-  while IFS= read -r f; do git -C "$top" check-ignore -q -- "$f" || printf '%s\n' "$f"; done | grep -c .)
+  while IFS= read -r f; do git -C "$top" check-ignore -q -- "$f" || printf '%s\n' "$f"; done)
+touched=$(grep -c . <<<"$changed_files")
 
 changed=$touched
 if ((bash && !reviewed)); then
@@ -92,6 +97,12 @@ if ((bash && !reviewed)); then
   ((whole > changed)) && changed=$whole
 fi
 ((changed >= min)) || exit 0
+
+# Passes only when everything that differs is prose. Anything unsure fails safe.
+behavior='(^|/)(SKILL|CLAUDE|CLAUDE\.local|AGENTS|GEMINI|MEMORY)\.md$|(^|/)(skills|agents|commands|rules|output-styles|plans|\.github|\.clinerules)/'
+prose='\.(md|rst)$'
+not_prose=$(grep -viE "$prose" <<<"$differs" | sed '/^$/d')
+[[ -z $not_prose ]] && ! grep -qiE "$behavior" <<<"$differs" && exit 0
 
 # Once per batch: only events the last block hadn't seen can block again.
 cache=${LOADOUT_CACHE:-$HOME/.cache/loadout}/review-gate

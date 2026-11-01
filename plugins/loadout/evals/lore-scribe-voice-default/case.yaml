@@ -1,0 +1,29 @@
+# A repo with no voice line gets the default: plain, and "you" in a how-to. Run with --scaffold --allow-tools Edit Write.
+schema_version: "1.1"
+name: lore-scribe-voice-default
+tags: [lore-scribe]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 14
+  allowed_tools: [Skill, Read, Glob, Grep, Edit, Write]
+  prompt: "Write docs/getting-started.md, a short how-to: install, run tidemark scan, then run tidemark diff to see what changed."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: lore-scribe
+    arm: with-only
+  - name: stays-plain
+    type: llm
+    focus:
+      source: file
+      path: docs/getting-started.md
+    criteria: "Pass only if the page is plain, professional documentation that speaks to the reader as you or in the imperative. Fail on any game or fantasy flavor, or on first-person narration."
+  - name: stays-a-how-to
+    type: llm
+    focus:
+      source: file
+      path: docs/getting-started.md
+    criteria: "Pass only if the page is a how-to: numbered or ordered steps a reader follows. Fail if it adds a feature tour, architecture or reference tables."

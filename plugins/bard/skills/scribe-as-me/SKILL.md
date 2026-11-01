@@ -1,13 +1,13 @@
 ---
 name: scribe-as-me
-description: "Drafts text that will be published under your name: PRs, issues, review replies, READMEs, chat. Shows the draft for approval and never posts it."
+description: "Drafts text that will be published under your name: PRs, issues, review replies, chat. Shows the draft for approval and never posts it."
 disable-model-invocation: true
 argument-hint: <what to write, and for whom>
 ---
 
 # Writing as me
 
-Other people will read this as if I wrote it. Draft it, show it to me, and post nothing until I say so.
+Other people will read this as if I wrote it. Draft it, show it to me, and post nothing until I say so. Documentation belongs to `loadout:lore-scribe` when it's installed.
 
 ## Voice
 
@@ -26,7 +26,6 @@ Other people will read this as if I wrote it. Draft it, show it to me, and post 
 - **Issue or bug report:** what happened, how to reproduce it, what I expected, what I've ruled out.
 - **Ticket (Jira or similar):** the outcome wanted, acceptance criteria a reviewer can check, and what is out of scope.
 - **Reply to a review or comment:** answer in the first line. Thank someone for something specific, or not at all. Own a mistake in one sentence and point to the fix.
-- **README:** what it is, who it's for, how to start, in that order.
 - **Chat message:** one message, no headers; length scales with what the reader has to decide.
 
 ## Before showing me the draft

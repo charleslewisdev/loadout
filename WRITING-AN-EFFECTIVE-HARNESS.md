@@ -94,17 +94,17 @@ If your marketplace repo is private, expect one more chore. A `github` source cl
 
 ## 3. Give every surface a budget
 
-Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, from November 1.
+Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share and skill descriptions, from November 1.
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
-| Harness share | About 3,000 tokens | 6,000 tokens | 4,539 | About 3% of a 200k window above the vendor floor |
+| Harness share | About 3,000 tokens | 6,000 tokens | 4,608 | About 3% of a 200k window above the vendor floor |
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 532 tokens | Anthropic's built-in styles run 250 to 370 tokens, more with examples |
 | User CLAUDE.md | About 30 lines | 200 lines | 30 lines | The docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, pitfalls |
 | SKILL.md body | Under 150 lines | 500 lines | At most 56 lines | The docs: "Keep `SKILL.md` under 500 lines" |
 | One skill description | | 200 characters | 132 to 188 | The listing budget in [section 5](#5-equip-skills-that-fire) |
-| All harness descriptions | | 5,000 characters | 1,626 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
+| All harness descriptions | | 5,000 characters | 1,791 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
 | Session-start output | Nothing on a configured machine | 300 characters | 0 | Re-sent after every compaction; checked by hand, not linted |
 
 The 200-line ceiling rests on token cost, not adherence. A factorial study found compliance of 60.0, 65.2, 67.7, and 64.0% at 25, 100, 250, and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still warn that "Bloated CLAUDE.md files cause Claude to ignore your actual instructions!" ([best practices](https://code.claude.com/docs/en/best-practices)).
@@ -137,7 +137,7 @@ Every enabled skill puts its name and description into every session. The space 
 
 Going over budget doesn't remove anything. The lowest-scoring skills lose their description and show as a bare name, and subagents on 200k models see that cut list. The score is uses times max(0.5^(days since use / 7), 0.1). A skill with `disable-model-invocation: true` stays out of the listing entirely.
 
-So keep each description under 200 characters, and say what the skill does and when to use it. On October 31, 2026, my ten skills hold 1,626 characters, and the six the model can pick hold 1,048. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
+So keep each description under 200 characters, and say what the skill does and when to use it. On November 1, 2026, my eleven skills hold 1,791 characters, and the seven the model can pick hold 1,222. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
 
 Signing in with a claude.ai account adds that account's enabled skills and connectors to every Claude Code session, on every machine, and they don't show up in your plugin list. Mine cost 7,038 of a 9,016 share. You can trim them per machine in `~/.claude/settings.json` without changing the account:
 
@@ -183,6 +183,9 @@ If you run your own, these will save you an afternoon:
 - Use `regex` for facts and `llm` for judgment. The README's own test failed "how do I add a skill" in 6 of 6 runs on complete answers, until four `regex` graders replaced the judge.
 - A document test scores about the same in both arms by design, because both get the same README. It passes when every answer is complete.
 - The sandbox scrubs `HOME` and custom environment variables. On Ubuntu, sandboxed Bash needs a bubblewrap AppArmor profile, and without one every shell-dependent case tests a broken sandbox.
+- Grant the tools a case grades. Without `--allow-tools Edit Write`, cases that write files fail in both arms, and it looks like a skill problem: on November 1, 2026, a missing grant took one case from 1.00 to 0.33 and I blamed the case.
+- Set `max_turns` for the skill, not the task. A skill that reads two references spends those turns first, so a tight limit ends a run before it writes anything.
+- Read the trace of a slow run. A README case took five minutes and scored 1.00, because a Stop hook sent six reviewers after a two-file docs edit. The score hid the bug.
 - A broken sandbox can look like a pass. With every Bash call failing, a case scored 1.0 on November 1, 2026, because its graders saw that commands were attempted. Aggregate results hold no reliable sign of it, so `scripts/eval` reads the kept traces and exits 3 when it finds the failure, or when it can't find a trace to check. [The eval results](docs/eval-results.md) mark those cases as not trusted.
 - `scripts/eval` always passes `--no-publish`. If you're signed in with a claude.ai subscription that has artifacts, the CLI otherwise publishes each report as a private artifact, and eval prompts are a publishing surface.
 
@@ -205,7 +208,7 @@ So every hook here runs through `hook-timed`, which logs its start and end, and 
 
 Scope your formatter to repos that have its config, or it will rewrite whole files in repos that don't use it. For desktop notifications, return the escape sequence in the hook output's `terminalSequence` field, which the binary describes as "A terminal escape sequence (e.g. OSC 9 / OSC 777 desktop-notification) for Claude Code to emit on your behalf".
 
-`review-gate` reads subagent transcripts too, and edits in the review's own turn count as its fixes. `LOADOUT_REVIEW_GATE=0` turns it off, and `LOADOUT_REVIEW_MIN_FILES` raises the bar. Two slots stay empty on purpose: a Bash guard, with a 50 ms budget, waits for a case `permissions.deny` can't express, and nothing runs per prompt.
+`review-gate` skips work that's nothing but prose docs, judged on everything that differs, and counts skills, rules, plans and instruction files as code. It reads subagent transcripts too, and edits in the review's own turn count as its fixes. `LOADOUT_REVIEW_GATE=0` turns it off, and `LOADOUT_REVIEW_MIN_FILES` raises the bar. Two slots stay empty on purpose: a Bash guard, with a 50 ms budget, waits for a case `permissions.deny` can't express, and nothing runs per prompt.
 
 ### Memory
 

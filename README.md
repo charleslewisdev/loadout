@@ -4,23 +4,23 @@
 
 Every Claude Code session starts at level 1. It doesn't know how you like to work, where your repo breaks convention, or what you learned the hard way last month.
 
-loadout is the gear I hand it at the door: nine skills, five hooks, and a statusline, packaged as a plugin marketplace with one installer. An optional second plugin, `bard`, adds a voice. One of the nine skills is a retro whose favorite move is deleting things.
+loadout is the gear I hand it at the door: ten skills, five hooks, and a statusline, packaged as a plugin marketplace with one installer. An optional second plugin, `bard`, adds a voice. One of the ten skills is a retro whose favorite move is deleting things.
 
 This repo is for you if you use Claude Code every day and your CLAUDE.md has started to look like a junk drawer. Fork it and change it, because a harness is personal and this one is mine. If you're auditing a harness for a team, start with [For a team](#for-a-team).
 
 ## Character sheet
 
-`/loadout:gear-stats` prints a longer version of this sheet. These stats are from October 31, 2026, on Claude Code 2.1.316, except Encumbrance, from November 1:
+`/loadout:gear-stats` prints a longer version of this sheet. These stats are from November 1, 2026, on Claude Code 2.1.316:
 
 | Stat | Value | In plain words |
 | --- | --- | --- |
-| **Encumbrance** | 4,539 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
-| **Inventory** | 9 skills, plus 1 in `bard` | Procedures Claude picks up when they apply, or that you type |
+| **Encumbrance** | 4,608 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
+| **Inventory** | 10 skills, plus 1 in `bard` | Procedures Claude picks up when they apply, or that you type |
 | **Reflexes** | 5 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
 | **Save point** | Every 90 days at most | A retro that opens one pull request of additions and deletions |
 
-Until November 2026 `scripts/budget` could miss account connectors, and it reported 5,986. The true figure was 9,016, over the ceiling, and most of it came from my Claude account, not this repo. Trimming the account's skills and connectors per machine brought it down, and the [audit log](docs/audit-log.md) keeps score. The `loadout` plugin is 400 of the total, and `bard` is 728.
+Until November 2026 `scripts/budget` could miss account connectors, and it reported 5,986. The true figure was 9,016, over the ceiling, and most of it came from my Claude account, not this repo. Trimming the account's skills and connectors per machine brought it down, and the [audit log](docs/audit-log.md) keeps score. The `loadout` plugin is 469 of the total, and `bard` is 728.
 
 > [!NOTE]
 > **About the evidence.** Every number here comes from a command I ran, or carries a link. Rules I could test had to change Claude's behavior in a with-and-without eval to stay, [the guide](WRITING-AN-EFFECTIVE-HARNESS.md) lists the exceptions, and [the eval results](docs/eval-results.md) show the latest score for every case. Anything marked **opinion** is my taste, not how Claude Code behaves.
@@ -92,13 +92,14 @@ To place something new, ask three questions:
 | `map-follow` | Claude | Runs the plan task by task in fresh subagents |
 | `bug-hunt` | Claude | Reproduces a bug with a failing test before it changes code |
 | `review-party` | Claude | Runs your checks and the app, sends independent reviewers, and keeps findings a verifier scores 80 of 100 or higher |
+| `lore-scribe` | Claude, on Markdown and `docs/` files | Writes docs by one set of rules, in each repo's own voice |
 | `pr-turn-in` | Claude | Handles branches, commits, and PRs, and checks each PR claim against `git diff` |
 | `gear-stats` | You | Prints the character sheet |
 | `gear-mend` | You | Logs one annoyance for the next retro, plus the fix when it's clear |
 | `gear-respec` | You | Runs the retro and proposes what to add and delete |
 | `scribe-as-me` (`bard`) | You | Drafts text published under your name, and never posts it |
 
-The five hooks check your configuration at session start, send desktop notifications on stop and on input needed (two hooks), format files where the repo uses prettier or ruff, and run `review-gate`. That last one blocks a stop once per batch of work when two or more files changed since the last `review-party`, so Claude reviews multi-file work before calling it done.
+The five hooks check your configuration at session start, send desktop notifications on stop and on input needed (two hooks), format files where the repo uses prettier or ruff, and run `review-gate`. That last one blocks a stop once per batch of work when two or more files changed since the last `review-party`, so Claude reviews multi-file work before calling it done. Work that's nothing but prose docs passes.
 
 ### One ticket, start to finish
 

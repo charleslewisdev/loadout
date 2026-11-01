@@ -18,11 +18,11 @@ The newest score for every eval case, written by `scripts/eval-summary --untrust
 | rephrase-a-rebase-rewrites-main | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
 | rephrase-a-uuid-v4-sequential | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
 | rephrase-b-add-retry | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
-| rephrase-b-config-timeout | bard | no | 0.50 | 2026-11-01 | 2.1.316 |
-| rephrase-b-docstring | bard | no | 0.83 | 2026-11-01 | 2.1.316 |
-| rephrase-b-fix-typo | bard | no | 0.50 | 2026-11-01 | 2.1.316 |
-| rephrase-b-rename | bard | no | 0.67 | 2026-11-01 | 2.1.316 |
-| rephrase-b-verbose-flag | bard | no | 0.83 | 2026-11-01 | 2.1.316 |
+| rephrase-b-config-timeout | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
+| rephrase-b-docstring | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
+| rephrase-b-fix-typo | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
+| rephrase-b-rename | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
+| rephrase-b-verbose-flag | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
 | rephrase-c-gil-threads-io | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
 | rephrase-c-put-idempotent | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
 | scribe-as-me-smoke | bard | no | 1.00 | 2026-11-01 | 2.1.316 |
@@ -30,7 +30,11 @@ The newest score for every eval case, written by `scripts/eval-summary --untrust
 | bug-hunt-smoke | loadout | yes | not trusted | 2026-10-30 | 2.1.312 |
 | gear-mend-smoke | loadout | yes | not run | | |
 | gear-respec-smoke | loadout | yes | not run | | |
-| map-draw-smoke | loadout | no | 0.33 | 2026-11-01 | 2.1.316 |
+| lore-scribe-readme | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |
+| lore-scribe-voice-default | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |
+| lore-scribe-voice-rpg | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |
+| lore-scribe-voice-unknown | loadout | no | 0.89 | 2026-11-01 | 2.1.316 |
+| map-draw-smoke | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |
 | map-follow-smoke | loadout | yes | not trusted | 2026-10-30 | 2.1.312 |
 | map-scout-smoke | loadout | no | 0.50 | 2026-11-01 | 2.1.316 |
 | pr-turn-in-smoke | loadout | yes | not trusted | 2026-10-30 | 2.1.312 |

@@ -1,0 +1,29 @@
+# A repo with a voice line gets that voice, and the plain facts stay. Run with --scaffold --allow-tools Edit Write.
+schema_version: "1.1"
+name: lore-scribe-voice-rpg
+tags: [lore-scribe]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 14
+  allowed_tools: [Skill, Read, Glob, Grep, Edit, Write]
+  prompt: "Write docs/getting-started.md, a short how-to: install, run tidemark scan, then run tidemark diff to see what changed."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: lore-scribe
+    arm: with-only
+  - name: wears-the-voice
+    type: llm
+    focus:
+      source: file
+      path: docs/getting-started.md
+    criteria: "Pass only if headings or short framing lines use a retro RPG flavor, such as quests, gear or save points. Fail if the page reads as plain documentation with no game flavor at all."
+  - name: facts-stay-plain
+    type: llm
+    focus:
+      source: file
+      path: docs/getting-started.md
+    criteria: "Pass only if the steps give the exact commands go install example.com/tidemark@latest, tidemark scan and tidemark diff, in that order, and each step's meaning is clear to someone who ignores the game flavor."
