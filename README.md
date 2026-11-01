@@ -14,7 +14,7 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 
 | Stat | Value | In plain words |
 | --- | --- | --- |
-| **Encumbrance** | 4,880 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
+| **Encumbrance** | 4,442 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
 | **Inventory** | 10 skills, plus 1 in `bard` and 1 in `homelab` | Procedures Claude picks up when they apply, or that you type |
 | **Reflexes** | 5 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
@@ -41,7 +41,7 @@ The installer reads the marketplace source from your checkout's `origin`, so you
 <details>
 <summary>What the installer changes, and how to uninstall</summary>
 
-The installer backs up `~/.claude/settings.json` to `~/.claude/backups/`, then deep-merges the profile over it with `jq`. The example profile registers your marketplace, enables `loadout`, and points the statusline at the marketplace clone. Arrays such as `permissions.allow` are unioned, so retiring an entry means deleting it by hand. Every other key survives, and a second run changes nothing. To keep one machine's settings outside your fork, add `--machine <file>`, which layers a private profile over the public one. Your user `~/.claude/CLAUDE.md` stays yours, because a plugin can't ship it.
+The installer backs up `~/.claude/settings.json` to `~/.claude/backups/`, then deep-merges the profile over it with `jq`. The example profile registers your marketplace, enables `loadout`, and points the statusline at the marketplace clone. Arrays such as `permissions.allow` are unioned, and every other key survives, so retiring an entry or a key means deleting it by hand. Removing it from a profile doesn't remove it from a machine. A second run changes nothing. To keep one machine's settings outside your fork, add `--machine <file>`, which layers a private profile over the public one. Your user `~/.claude/CLAUDE.md` stays yours, because a plugin can't ship it.
 
 To uninstall:
 

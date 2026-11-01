@@ -113,3 +113,65 @@ The share is now under the 6,000 ceiling, and the share without connectors is un
 Before takes the two shares and the `loadout` row from a 0.9.0 run, and the other rows from the first trim. The rest includes `rust-analyzer-lsp` at 4 tokens, as earlier entries do.
 
 **Hook p95, skill usage and eval results:** no hook or kit skill changed, so there's no new table.
+
+## 2026-11-01: kit audit
+
+**CLI:** 2.1.316, on Haiku, three usable runs per configuration.
+
+**Why:** every kit item needs a verdict on evidence, and #31 asked for one. The audit also clears the override trouble from the previous entry.
+
+**What changed:** no kit item was removed, and no language server has landed yet. Deleting one synced skill from the account recovered 269 tokens. Keying another by its full name recovered 169, since a bare key in user settings doesn't reach a synced skill that shares its name with another.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Total at turn 0, with connectors and auto-memory | 22,545 | 22,105 |
+| Harness share, with connectors | 4,880 | 4,442 |
+| Harness share, without connectors | 3,187 | 2,749 |
+| Vendor floor | 16,972 | 16,972 |
+| Auto-memory section, outside the share | 693 | 692 |
+| Account-synced skills | 1,137 (16) | 699 (15) |
+| Account connectors | 1,693 | 1,693 |
+| `bard` plugin | 728 | 728 |
+| User CLAUDE.md | 643 | 643 |
+| `loadout` plugin | 469 | 469 |
+| `homelab` plugin | 73 | 73 |
+| Personal skills and the rest | 137 | 137 |
+
+Before is the After column of the previous entry, plus its total and auto-memory figures from the same run. Each total is measured on its own, so it can differ from the sum of its parts by a token.
+
+**Skill verdicts.** Invocations are `Skill` tool calls in local transcripts, under the current name, so they cover two days for the skills renamed on October 30. Older counts are from `scripts/retro-evidence --since 2026-09-20`, which reads Claude Code's lifetime usage record: "before" is the same skill under its old name, and "predecessor" is the third-party skill it replaced. Typed-only skills add nothing to the skill listing, so keeping an unused one costs a line in the README, not tokens.
+
+| Skill | Invocations in transcripts | Evidence beyond that | Verdict |
+| --- | --- | --- | --- |
+| `review-party` | 12 | 16 uses of the bundled `code-review` it overlaps, but it adds the project's checks and verifies each finding. Caught a false claim in the draft of #45. Eval not run | Keep |
+| `pr-turn-in` | 5 | 13 before the rename, eval not trusted | Keep |
+| `unraid` | 1 | 42 before the move, evals 1.00 | Keep, per machine in `homelab` |
+| `map-scout` | 1 | 2 before the rename, predecessor 131, eval 0.50 in #38 | Keep, fix the eval in #38 |
+| `map-draw` | 0 | 3 before the rename, predecessor 79, eval 1.00 | Keep |
+| `map-follow` | 0 | 2 before the rename, predecessor 69, eval not trusted | Keep |
+| `lore-scribe` | 0 | New on November 1, four evals at 0.89 or better | Keep |
+| `gear-stats` | 0 | 6 before the rename, typed only | Keep |
+| `gear-respec` | 0 | Runs the retro this log depends on, typed only, eval not run | Keep |
+| `bug-hunt` | 0 | 1 before the rename, predecessor 23, eval not trusted | Keep until the next retro, then remove if still unused |
+| `gear-mend` | 0 | Nothing logged yet, typed only, eval not run | Keep on the same test |
+| `scribe-as-me` | 0 | Eval 1.00, typed only, and no use recorded under this name | Keep on the same test |
+
+**Output style: keep.** `bard:peer` is most of the 728-token `bard` plugin, and every session uses it. 19 of its plugin's 21 eval cases pass, one isn't trusted, and `rephrase-a-put-idempotent` at 0.00 goes with #38.
+
+**Hooks and statusline: keep.** All five hooks fired in the last 7 days, and all are under the 300 ms target at p95. No hook changed, so the differences below are noise. `session-start` was killed once in 90 days, and not in the last 7. The statusline has no usage record, so it stays by default.
+
+| Hook | Calls, 90 days | Before ms | After ms |
+| --- | --- | --- | --- |
+| `format` | 478 | 185.2 | 185.2 |
+| `notify-input` | 253 | 58.2 | 58.2 |
+| `notify-stop` | 1,210 | 48.3 | 46.8 |
+| `review-gate` | 742 | 97.4 | 84.7 |
+| `session-start` | 941 | 39.2 | 35.5 |
+
+**Instruction files: no change.** The project CLAUDE.md has 10 lines and the user file has 30, both within target. I read both against the test, and found no line to cut.
+
+**Language servers.** The code on this machine is 1,225 TypeScript files, 95 JavaScript, 79 Python and 17 Rust, with no Go. So `rust-analyzer-lsp` stays at 4 tokens, TypeScript and Python get a language server chosen per machine, and Go doesn't. Those two aren't installed or measured yet, and #31 stays open until they are.
+
+**Shared kit:** 18 of 20 items are on every machine of mine: 11 skills, 5 hooks, the statusline and the output style. `unraid` and `rust-analyzer-lsp` are chosen per machine. With the two new language servers it's 18 of 22, or 82%.
+
+**Eval results:** of 37 cases, 27 pass, 2 score below 0.80, 5 aren't trusted and 3 haven't run. See [eval-results.md](eval-results.md).

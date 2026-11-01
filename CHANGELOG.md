@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- The README says that removing a key from a profile doesn't remove it from a machine, since the installer only merges.
+- The guide explains how a `skillOverrides` key misses a synced skill that shares its name.
 - The public repo standard covers rulesets as well as classic branch protection, since each endpoint sees only its own kind.
 - `guard/scan` no longer misses a term after a forged end marker, in a path holding ` b/`, or in a path git quotes, and no longer prints a quoted path that matches.
 - `guard/scan` no longer depends on the locale or on local git config, reads author and committer names, ref names and tag messages, and withholds a path that matches a secret pattern.

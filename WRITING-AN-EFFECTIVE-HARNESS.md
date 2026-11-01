@@ -110,7 +110,7 @@ Every always-on surface gets a target and a ceiling. The "Now" column is from Oc
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
-| Harness share | About 3,000 tokens | 6,000 tokens | 4,880 | About 3% of a 200k window above the vendor floor |
+| Harness share | About 3,000 tokens | 6,000 tokens | 4,442 | About 3% of a 200k window above the vendor floor |
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 532 tokens | Anthropic's built-in styles run 250 to 370 tokens, more with examples |
 | User CLAUDE.md | About 30 lines | 200 lines | 30 lines | The docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, pitfalls |
@@ -153,7 +153,7 @@ So keep each description under 200 characters, and say what the skill does and w
 
 Signing in with a claude.ai account adds that account's enabled skills and connectors to every Claude Code session, on every machine, and they don't show up in your plugin list. Mine cost 7,038 of a 9,016 share. You can trim them per machine in `~/.claude/settings.json` without changing the account:
 
-- **`skillOverrides`** maps a skill name to `on`, `name-only`, `user-invocable-only` or `off`.
+- **`skillOverrides`** maps a skill name to `on`, `name-only`, `user-invocable-only` or `off`. In user settings, a bare name that a synced skill shares with another skill or workflow doesn't reach the synced skill, so key it by its full name, `anthropic-skills:<name>`. The failure is silent, and it cost me 438 tokens across two skills until the budget showed it.
 - **`deniedMcpServers`** takes `{"serverName": "<name>"}` entries, and a blocked connector costs nothing.
 
 Decide with evidence: count each skill and connector's tool calls in your transcripts, and use `scripts/budget` to measure each connector and the skills as a group. I found one connector doing all the work, with 145 calls in 195 transcripts, and four with none. Of 16 skills, 2 appeared in those transcripts at all. That took the share from 9,016 to 4,539 tokens.
