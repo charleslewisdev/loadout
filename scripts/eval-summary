@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Writes the newest eval result of every current case as a Markdown table.
+#
+#   scripts/eval-summary [--untrusted-since yyyy-mm-dd]   prints to stdout
+#
+# Reads plugins/*/evals/results, which git ignores, so the committed table in
+# docs/eval-results.md is the only record a reader sees. It holds case names and
+# scores only, no prompts or transcripts. An older result stays listed with its date.
+#
+# --untrusted-since marks results on or after that date as not trusted for cases
+# that give the model Bash. Use the date Bash stopped working in the eval sandbox:
+# aggregate results hold no reliable sign of it, and graders can pass anyway.
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root"
+since=''
+case ${1:-} in
+  --untrusted-since) since=$2 ;;
+  '') ;;
+  *) sed -n '2,13s/^# \{0,1\}//p' "$0" >&2; exit 2 ;;
+esac
+
+echo '| Case | Plugin | Uses Bash | Score | Date | CLI |'
+echo '| --- | --- | --- | --- | --- | --- |'
+while IFS= read -r file; do
+  dir=$(dirname "$file")
+  name=$(basename "$dir")
+  plugin=$(cut -d/ -f2 <<<"$file")
+  bash=no
+  grep -Eq '^ *allowed_tools:.*\bBash\b' "$file" && bash=yes
+  # Newest first by directory name, which is a timestamp.
+  row=$(find "plugins/$plugin/evals/results" -name aggregate-result.json 2>/dev/null | sort -r |
+    xargs -r jq -r --arg n "$name" '.startedAt[0:10] as $d | .claudeVersion as $v |
+      .cases[] | select(.name == $n and .aggregates.score != null) |
+      "\(.aggregates.score)\t\($d)\t\($v)"' 2>/dev/null | head -1) || true
+  if [[ -z $row ]]; then
+    printf '| %s | %s | %s | not run | | |\n' "$name" "$plugin" "$bash"
+    continue
+  fi
+  IFS=$'\t' read -r score date version <<<"$row"
+  shown=$(awk -v s="$score" 'BEGIN { printf "%.2f", s }')
+  [[ $bash == yes && -n $since && ! $date < $since ]] && shown='not trusted'
+  printf '| %s | %s | %s | %s | %s | %s |\n' "$name" "$plugin" "$bash" "$shown" "$date" "$version"
+done < <(git ls-files 'plugins/*/evals/*/case.yaml' | sort)

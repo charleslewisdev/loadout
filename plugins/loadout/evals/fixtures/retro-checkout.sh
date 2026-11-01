@@ -7,7 +7,8 @@ set -euo pipefail
 git init -q -b main .
 git config user.name Dev
 git config user.email dev@localhost
-mkdir -p .claude-plugin retros/friction scripts plugins/loadout/hooks
+mkdir -p .claude-plugin docs retros/friction scripts plugins/loadout/hooks
+printf '# Audit log\n\n## 2026-06-01: baseline\n\n| Metric | Before | After |\n| --- | --- | --- |\n| Share | 3,300 | 3,300 |\n' >docs/audit-log.md
 printf '{"name":"loadout","owner":{"name":"dev"},"plugins":[{"name":"loadout","source":"./plugins/loadout"}]}\n' >.claude-plugin/marketplace.json
 printf '2026-08-02 the formatter rewrote a whole JSON file in a repo that has no prettier config -> logged (none)\n' >retros/friction/2026-08-02-formatter-json.md
 printf '2026-08-19 a PR description ended by asking whether to open the PR -> logged (none)\n' >retros/friction/2026-08-19-pr-question.md

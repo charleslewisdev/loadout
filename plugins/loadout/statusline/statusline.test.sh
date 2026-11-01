@@ -131,7 +131,7 @@ grep -q '\$' <<<"$out"; check "drops the cost segment" $((1 - $?))
 grep -q '+40/-5' <<<"$out"; check "shows churn when non-zero" $?
 grep -q '█' <<<"$out"; check "draws a filled bar" $?
 grep -q '░' <<<"$out"; check "draws the empty track" $?
-grep -qE 'budget|cache cold|PR #' <<<"$out"; check "hides health, cache and PR markers when there is nothing to say" $((1 - $?))
+grep -qE 'budget (over|stale|unmeasured)|cache cold|PR #' <<<"$out"; check "hides health, cache and PR markers when there is nothing to say" $((1 - $?))
 grep -qE 'think:off|Explanatory|⚡' <<<"$out"; check "hides every badge when default" $((1 - $?))
 
 out=$(render fresh)

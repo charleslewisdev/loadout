@@ -51,6 +51,8 @@ Write `retros/<yyyy-mm-dd>.md`:
 
 This file dates the retro for /loadout:gear-stats.
 
+Then add an entry to `docs/audit-log.md` under the heading `## <yyyy-mm-dd>`, in the format the file's first entry uses: the CLI version, why the audit ran, what changed, and the same metrics with before and after columns. The before column is the previous entry's after column. `scripts/check` fails if a retro has no entry. `scripts/budget` prints connector names, which can be private and which the guard can't catch. Keep connector and account-synced skill names out of the entry, the retro file and the pull request, and give those surfaces as totals or as "connector 1", "connector 2".
+
 ## 5. Open the pull request
 
 Make the repository changes on the branch, commit following `loadout:pr-turn-in` (never with `--no-verify`), and run `scripts/check`. With no remote (`git remote` prints nothing), stop after the commit and say so. Otherwise push with `git push -u origin retro/<date>`, write the title and body to a file, run `guard/scan text <file>` on it and fix what it names, then open one pull request with `gh pr create --title ... --body-file <file>`, listing the proposals and the feedback wanted. The guard's pre-push scan runs on the push; if it refuses, fix what it names. Never merge. Finish by switching back to the branch the checkout started on.

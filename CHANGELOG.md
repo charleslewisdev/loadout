@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `scripts/budget` no longer undercounts. Connector runs wait for connectors, runs that miss them are discarded and repeated, and a machine where they never arrive exits 2 and keeps the last good result.
+- `scripts/eval` exits 3 when Bash failed in the eval sandbox, because such a run can still score 1.0.
+
+### Changed
+
+- `scripts/budget` reports connectors, synced skills, each plugin and the user CLAUDE.md from real on and off runs, replacing the character estimate. The headline share now includes connectors, so it can fail where it used to pass.
+
+### Added
+
+- `docs/audit-log.md`, one entry per harness audit, which `gear-respec` adds to and `scripts/check` enforces.
+- `docs/eval-results.md`, written by `scripts/eval-summary`.
+
 ## 0.8.0, 2026-10-30
 
 ### Changed

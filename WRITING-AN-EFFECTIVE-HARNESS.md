@@ -31,18 +31,35 @@ claude -p "Reply with exactly the word OK and nothing else." --model haiku --out
   | jq '.usage | .input_tokens + .cache_creation_input_tokens + .cache_read_input_tokens'
 ```
 
-`scripts/budget` runs that in an empty directory in four configurations, three times each, and subtracts. It uses Haiku because Haiku has the smallest window in regular use, so truncation shows there first.
+`scripts/budget` runs that in an empty directory in four configurations, three usable runs each, and subtracts. It then switches each surface off in turn with `--settings`, so the cost by surface comes from real on and off runs, not character counts. It uses Haiku because Haiku has the smallest window in regular use, so truncation shows there first.
 
-| Configuration | Added to the command | Before loadout | September 21, 2026 | October 31, 2026 (2.1.316) |
-| --- | --- | --- | --- | --- |
-| As configured | nothing | 25,288 to 25,843 | 23,944 | 23,653 |
-| Auto-memory off | `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` | 22,333 | 20,995 | 22,959 |
-| Vendor floor | `--safe-mode` | 17,859 | 17,712 | 16,973 |
-| **Harness share** | auto-memory off minus the floor | **4,474** | **3,283** | **5,986** |
+| Configuration | Added to the command | Before loadout | September 21, 2026 | October 31, 2026 (2.1.316) | November 1, 2026 (2.1.316) |
+| --- | --- | --- | --- | --- | --- |
+| As configured | nothing | 25,288 to 25,843 | 23,944 | 23,653 | 26,681 |
+| Auto-memory off | `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` | 22,333 | 20,995 | 22,959 | 25,989 |
+| Vendor floor | `--safe-mode` | 17,859 | 17,712 | 16,973 | 16,973 |
+| **Harness share** | auto-memory off minus the floor | **4,474** | **3,283** | **5,986** | **9,016** |
 
-The floor is Claude Code's own system prompt, built-in tools, and bundled skills. The ceiling is 6,000 tokens, and the target is about 3,000. So yes, the right-hand column is a problem. The script attributes about 2,881 tokens, before truncation, to 16 skills synced to my Claude account, and about 570 to the `loadout` plugin. That's the first job for the next retro.
+The last two columns are the same setup a day apart. The October figure missed connectors, and the November figure doesn't, so older columns may undercount too. Each harness audit since then has an entry in the [audit log](docs/audit-log.md).
 
-The number is slippery, so read yours with care. Use `--safe-mode` for the floor, because `--tools ""` also strips 15,600 tokens of built-in tools. Run it three times and take the highest, because MCP servers and health checks race the first request: one set of three runs in September gave 1,754 to 3,268. Keep the auto-memory section out of the ceiling if you've chosen to run it, so the budget doesn't punish a decision you made on purpose.
+The floor is Claude Code's own system prompt, built-in tools, and bundled skills. The ceiling is 6,000 tokens, and the target is about 3,000. So yes, the right-hand column is a problem. Here's where it goes on November 1, 2026:
+
+| Surface | Tokens |
+| --- | --- |
+| Account-synced skills, 16 of them | 4,008 |
+| Account connectors, 5 of them | 3,030 |
+| `bard` plugin, including the output style | 728 |
+| User CLAUDE.md | 643 |
+| `loadout` plugin | 400 |
+| Personal skills and the rest, by subtraction | 207 |
+
+Most of the share comes from the account, not the harness. Trimming that is the first job for the next retro.
+
+The number is slippery, so read yours with care. Use `--safe-mode` for the floor, because `--tools ""` also strips 15,600 tokens of built-in tools. Keep the auto-memory section out of the ceiling if you've chosen to run it, so the budget doesn't punish a decision you made on purpose.
+
+Connectors race the first request. A claude.ai connector can connect a few hundred milliseconds too late to make it into the request, and then the whole set is missing, so runs land on one of two totals with nothing in between. Mine gave 22,947 or 25,977. Taking the highest of three isn't reliable, because all three can miss. It also misled me twice: my reported share was 3,030 tokens short, and when connectors arrived in one configuration and not another, their cost showed up as auto-memory.
+
+`scripts/budget` handles this in two steps. It adds a silent `SessionStart` hook through `--settings` that holds the first request for two seconds, which costs no tokens and took arrival from about half of runs to 12 of 12. It then checks each run's debug log: the line `Dynamic tool loading: 0/76 deferred tools included` shows how many deferred tools the request had, and any run below the highest count for that configuration is thrown away and repeated. Don't trust a late "Successfully connected" line as the test, because some connectors log it before the request and still miss it. `CLAUDE_CODE_MCP_CONNECTOR_PREWAIT_MS` looks like the right switch, and in my tests it didn't help.
 
 Two popular shortcuts give you the wrong answer. `claude plugin details` counts neither output styles nor session-start output, so it once showed about 0 always-on tokens while my style loaded in every session. A logging proxy is great for seeing structure, but `ANTHROPIC_BASE_URL` switches off deferred tool loading: the same prompt cost 79,181 tokens through a proxy and 25,378 without one.
 
@@ -76,11 +93,11 @@ If your marketplace repo is private, expect one more chore. A `github` source cl
 
 ## 3. Give every surface a budget
 
-Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026.
+Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, from November 1.
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
-| Harness share | About 3,000 tokens | 6,000 tokens | 5,986 | About 3% of a 200k window above the vendor floor |
+| Harness share | About 3,000 tokens | 6,000 tokens | 9,016 | About 3% of a 200k window above the vendor floor |
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 532 tokens | Anthropic's built-in styles run 250 to 370 tokens, more with examples |
 | User CLAUDE.md | About 30 lines | 200 lines | 30 lines | The docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, pitfalls |
@@ -156,6 +173,7 @@ If you run your own, these will save you an afternoon:
 - Use `regex` for facts and `llm` for judgment. The README's own test failed "how do I add a skill" in 6 of 6 runs on complete answers, until four `regex` graders replaced the judge.
 - A document test scores about the same in both arms by design, because both get the same README. It passes when every answer is complete.
 - The sandbox scrubs `HOME` and custom environment variables. On Ubuntu, sandboxed Bash needs a bubblewrap AppArmor profile, and without one every shell-dependent case tests a broken sandbox.
+- A broken sandbox can look like a pass. With every Bash call failing, a case scored 1.0 on November 1, 2026, because its graders saw that commands were attempted. Aggregate results hold no reliable sign of it, so `scripts/eval` reads the kept traces and exits 3 when it finds the failure, or when it can't find a trace to check. [The eval results](docs/eval-results.md) mark those cases as not trusted.
 - `scripts/eval` always passes `--no-publish`. If you're signed in with a claude.ai subscription that has artifacts, the CLI otherwise publishes each report as a private artifact, and eval prompts are a publishing surface.
 
 Research on tuning guidance points the same way: repository guidance tuned with synthetic bug-fix probes resolved 33.0% of SWE-bench Verified tasks, against 28.3% for the static knowledge base it started from and 25.5% unguided ([arXiv 2606.20512](https://arxiv.org/abs/2606.20512)).
@@ -278,7 +296,7 @@ So I started over on September 21, 2026, and the first thing I built was a numbe
 
 Then the evals went to work on my own ideas. Five style rules fell, two skills failed to fire, and the share dropped to 3,283 tokens once the legacy setup was gone. superpowers was disabled the day its replacements landed. Uninstalling the old setup turned out to be the easy part, because private names were still scattered all over the machine, and `guard/scan --path` exists because of that. The first retro proposed no repository changes. Its work was memory, cutting the two largest indexes from 156 and 144 lines to 21 and 19.
 
-Crystal Bridge grew up alongside it, and in late October the notify hook learned to stay quiet under its sessions. Then I got the repo ready for strangers: guardrails on anything that publishes, skills renamed to group in the slash menu, `bard` split out so the voice is optional, and the review gate. By the end of October the share had climbed back to 5,986, with skills synced to my account as the largest piece, which is exactly why the retro is on a schedule.
+Crystal Bridge grew up alongside it, and in late October the notify hook learned to stay quiet under its sessions. Then I got the repo ready for strangers: guardrails on anything that publishes, skills renamed to group in the slash menu, `bard` split out so the voice is optional, and the review gate. By the end of October the share had climbed to a reported 5,986, which section 1 shows was really 9,016 once connectors counted, with skills synced to my account as the largest piece, which is exactly why the retro is on a schedule.
 
 ### What I got wrong
 

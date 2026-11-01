@@ -11,7 +11,9 @@
 #      it exists (never in CI)
 #   4. plugin, marketplace and skill names against guard/forbidden-names
 #   5. the statusline, notify, session-start, review gate and gh publication hook tests, and guard/scan --path and retro-evidence on synthetic homes
-#   6. locally only: claude plugin validate .
+#   6. scripts/budget and scripts/eval against a stub claude
+#   7. every retro since the audit log began has an entry in docs/audit-log.md
+#   8. locally only: claude plugin validate .
 set -uo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -92,6 +94,36 @@ statusline_tests() {  # print only the failed assertions, keep the suite's statu
   out=$(plugins/loadout/statusline/statusline.test.sh 2>&1) || rc=$?
   ((rc == 0)) || grep '✗' <<<"$out"
   return "$rc"
+}
+
+budget_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(scripts/budget.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep '✗' <<<"$out"
+  return "$rc"
+}
+
+eval_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(scripts/eval.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep '✗' <<<"$out"
+  return "$rc"
+}
+
+# A retro must not depend on someone remembering the log, so a retro with no entry
+# fails here. Retros from before the log's first entry are exempt.
+audit_log_current() {
+  local log=docs/audit-log.md first f day ok=0
+  [[ -r $log ]] || { echo "$log is missing"; return 1; }
+  first=$(sed -n 's/^## \([0-9-]\{10\}\).*/\1/p' "$log" | sort | head -1)
+  [[ -n $first ]] || { echo "$log has no dated entry"; return 1; }
+  for f in retros/[0-9]*.md; do
+    [[ -e $f ]] || continue
+    day=$(basename "$f" .md)
+    [[ $day < $first ]] && continue
+    grep -q "^## $day" "$log" || { echo "$f has no entry in $log"; ok=1; }
+  done
+  return "$ok"
 }
 
 # retro-evidence on a synthetic home: it must exit 0, find the correction, withhold a
@@ -197,6 +229,9 @@ step 'review gate tests' review_gate_tests
 step 'session-start hook tests' session_start_tests
 step 'retro-evidence on a synthetic home' retro_evidence_test
 step 'guard/scan --path on a synthetic tree' path_scan_test
+step 'budget script tests' budget_tests
+step 'eval wrapper tests' eval_tests
+step 'audit log covers every retro' audit_log_current
 ((ci)) || step 'claude plugin validate' claude plugin validate .
 
 if ((${#failed[@]})); then

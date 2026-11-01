@@ -40,7 +40,10 @@ b=$cache/budget
 if [[ -r $b ]]; then
   range=$(commas "$(lo share "$b")"); [[ $(lo share "$b") != "$(hi share "$b")" ]] && range+=" to $(commas "$(hi share "$b")")"
   echo "Harness share $range tokens against a $(commas "$(field ceiling "$b")") ceiling: $(field result "$b"), measured $(age "$b") on Claude Code $(field claude_version "$b")."
-  echo "Vendor floor $(commas "$(lo floor "$b")"); auto-memory section up to $(commas "$(hi automemory "$b")"); MCP servers up to $(commas "$(hi mcp "$b")")."
+  connectors_shown=$(commas "$(field connectors "$b")") synced_shown=$(commas "$(field synced_skills "$b")")
+  [[ -z $connectors_shown ]] && hints+=("This budget predates connector measurement, so it may undercount: run /loadout:gear-stats --measure.")
+  [[ -n $(field share_without_connectors "$b") ]] && echo "Without connectors: $(commas "$(hi share_without_connectors "$b")") tokens."
+  echo "Vendor floor $(commas "$(lo floor "$b")"); auto-memory section up to $(commas "$(hi automemory "$b")"); connectors ${connectors_shown:-unknown}; synced skills ${synced_shown:-unknown}."
   if [[ -n $(field listing_chars "$b") ]]; then
     echo "Skill listing: $(field listing_skills "$b") skills, $(commas "$(field listing_chars "$b")") characters against a budget of $(commas "$(field listing_budget "$b")"), so descriptions are cut. Most of it is bundled and account-synced skills, which the harness does not control."
   fi

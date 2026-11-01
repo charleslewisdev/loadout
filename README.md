@@ -10,20 +10,20 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 
 ## Character sheet
 
-`/loadout:gear-stats` prints a longer version of this sheet. These stats are from October 31, 2026, on Claude Code 2.1.316:
+`/loadout:gear-stats` prints a longer version of this sheet. These stats are from October 31, 2026, on Claude Code 2.1.316, except Encumbrance, from November 1:
 
 | Stat | Value | In plain words |
 | --- | --- | --- |
-| **Encumbrance** | 5,986 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
+| **Encumbrance** | 9,016 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
 | **Inventory** | 9 skills, plus 1 in `bard` | Procedures Claude picks up when they apply, or that you type |
 | **Reflexes** | 5 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
 | **Save point** | Every 90 days at most | A retro that opens one pull request of additions and deletions |
 
-Yes, that's 14 tokens from the ceiling. The `loadout` plugin is about 570 of them, and the biggest piece is skills synced to my Claude account, at about 2,881 tokens before truncation. It's the first job for the next save point.
+Yes, that's over the ceiling, and the number is new. Until November 2026 `scripts/budget` could miss account connectors, and it reported 5,986. The `loadout` plugin is 400 of the total, `bard` is 728, and skills and connectors from my Claude account are 7,038. Trimming those is the next job, and the [audit log](docs/audit-log.md) keeps score.
 
 > [!NOTE]
-> **About the evidence.** Every number here comes from a command I ran, or carries a link. Rules I could test had to change Claude's behavior in a with-and-without eval to stay, and [the guide](WRITING-AN-EFFECTIVE-HARNESS.md) lists the exceptions. Anything marked **opinion** is my taste, not how Claude Code behaves.
+> **About the evidence.** Every number here comes from a command I ran, or carries a link. Rules I could test had to change Claude's behavior in a with-and-without eval to stay, [the guide](WRITING-AN-EFFECTIVE-HARNESS.md) lists the exceptions, and [the eval results](docs/eval-results.md) show the latest score for every case. Anything marked **opinion** is my taste, not how Claude Code behaves.
 
 ## Install
 

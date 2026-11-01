@@ -7,20 +7,54 @@
 # when the account supports it, and eval prompts are a publishing surface. It
 # refuses --publish-report. Cases that plant fixtures need --scaffold, which stays
 # off unless passed. Results land in <plugin-dir>/evals/results/, which git ignores.
-set -euo pipefail
+#
+# Exits 3 if Bash failed in the eval sandbox, whatever the score says, or if it
+# couldn't check: graders see that a command was attempted, so a broken sandbox can
+# score 1.0. Only the kept traces show it reliably, so every run keeps them and this
+# removes them afterward, unless you passed --keep-temp yourself.
+set -uo pipefail
 
 if [[ $# -lt 1 || $1 == -* ]]; then
-  sed -n '2,9s/^# \{0,1\}//p' "$0" >&2
+  sed -n '2,14s/^# \{0,1\}//p' "$0" >&2
   exit 2
 fi
 plugin=$1
 shift
+keep=0
 for arg in "$@"; do
   case $arg in
     --publish-report | --publish-report=*)
       echo "scripts/eval: --publish-report is refused; eval reports stay local" >&2
       exit 2
       ;;
+    --keep-temp) keep=1 ;;
   esac
 done
-exec claude plugin eval "$plugin" --no-publish --model claude-sonnet-5 --threshold 0.8 "$@"
+
+out=$(mktemp)
+trap 'rm -f "$out"' EXIT
+claude plugin eval "$plugin" --no-publish --model claude-sonnet-5 --threshold 0.8 --keep-temp "$@" 2>&1 | tee "$out"
+rc=${PIPESTATUS[0]}
+
+broken=0 checked=0
+while IFS= read -r dir; do
+  [[ -d $dir ]] || continue
+  checked=$((checked + 1))
+  # sealed/ is mode 000 and holds what the plugin wrote; the traces are in the rest.
+  grep -rqs -E -e 'apply-seccomp|bwrap: ' --exclude-dir=sealed "$dir" && broken=1
+  if ((!keep)) && [[ $(basename "$dir") == claude-eval-* && $dir != *..* && ! -L $dir ]]; then
+    chmod -R u+rwx "$dir" 2>/dev/null
+    rm -rf "$dir"
+  fi
+  # Anchored: grader lines are indented and can quote anything a plugin wrote.
+done < <(sed -n 's/^⚠ kept \(\/[^:]*\): .*/\1/p' "$out")
+
+if ((broken)); then
+  echo "scripts/eval: Bash failed in the eval sandbox, so these scores are invalid whatever they say" >&2
+  exit 3
+fi
+if ((checked == 0)) && ! grep -q '^No eval cases found' "$out"; then
+  echo "scripts/eval: could not check the sandbox, because no kept trace was found; don't trust these scores" >&2
+  exit 3
+fi
+exit "$rc"
