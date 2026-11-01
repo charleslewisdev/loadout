@@ -4,7 +4,7 @@
 
 Every Claude Code session starts at level 1. It doesn't know how you like to work, where your repo breaks convention, or what you learned the hard way last month.
 
-loadout is the gear I hand it at the door: ten skills, five hooks, and a statusline, packaged as a plugin marketplace with one installer. An optional second plugin, `bard`, adds a voice. One of the ten skills is a retro whose favorite move is deleting things.
+loadout is the gear I hand it at the door: ten skills, five hooks, and a statusline, packaged as a plugin marketplace with one installer. Two optional plugins add more: `bard` adds a voice, and `homelab` adds server skills. One of the ten skills is a retro whose favorite move is deleting things.
 
 This repo is for you if you use Claude Code every day and your CLAUDE.md has started to look like a junk drawer. Fork it and change it, because a harness is personal and this one is mine. If you're auditing a harness for a team, start with [For a team](#for-a-team).
 
@@ -15,7 +15,7 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 | Stat | Value | In plain words |
 | --- | --- | --- |
 | **Encumbrance** | 4,608 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
-| **Inventory** | 10 skills, plus 1 in `bard` | Procedures Claude picks up when they apply, or that you type |
+| **Inventory** | 10 skills, plus 1 in `bard` and 1 in `homelab` | Procedures Claude picks up when they apply, or that you type |
 | **Reflexes** | 5 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
 | **Save point** | Every 90 days at most | A retro that opens one pull request of additions and deletions |
@@ -36,18 +36,18 @@ git clone https://github.com/<you>/loadout ~/code/loadout
 ~/code/loadout/install.sh example
 ```
 
-The installer reads the marketplace source from your checkout's `origin`, so your fork updates only when you push. The `example` profile enables `loadout` alone. `profiles/workstation.json` is my machine, with `bard` and its forced style, which overrides any style you pick.
+The installer reads the marketplace source from your checkout's `origin`, so your fork updates only when you push. The `example` profile enables `loadout` alone. `profiles/workstation.json` is my machine, with `homelab`, `bard` and its forced style, which overrides any style you pick.
 
 <details>
 <summary>What the installer changes, and how to uninstall</summary>
 
-The installer backs up `~/.claude/settings.json` to `~/.claude/backups/`, then deep-merges the profile over it with `jq`. The example profile registers your marketplace, enables `loadout`, and points the statusline at the marketplace clone. Every other key survives, and a second run changes nothing. Your user `~/.claude/CLAUDE.md` stays yours, because a plugin can't ship it.
+The installer backs up `~/.claude/settings.json` to `~/.claude/backups/`, then deep-merges the profile over it with `jq`. The example profile registers your marketplace, enables `loadout`, and points the statusline at the marketplace clone. Arrays such as `permissions.allow` are unioned, so retiring an entry means deleting it by hand. Every other key survives, and a second run changes nothing. To keep one machine's settings outside your fork, add `--machine <file>`, which layers a private profile over the public one. Your user `~/.claude/CLAUDE.md` stays yours, because a plugin can't ship it.
 
 To uninstall:
 
-1. Run `claude plugin uninstall loadout@loadout`, and `bard@loadout` too if you enabled it.
+1. Run `claude plugin uninstall loadout@loadout`, and `bard@loadout` or `homelab@loadout` too if you enabled them.
 2. Run `claude plugin marketplace remove loadout`.
-3. Restore `settings.json` from the oldest file in `~/.claude/backups/`, taken before your first install, or delete the keys the profile added, including `statusLine` and `env.LOADOUT_REPO`.
+3. Restore `settings.json` from the oldest file in `~/.claude/backups/`, taken before your first install, or delete the keys the profile added, including `statusLine`, `permissions.allow` and `env.LOADOUT_REPO`.
 
 </details>
 
@@ -98,6 +98,7 @@ To place something new, ask three questions:
 | `gear-mend` | You | Logs one annoyance for the next retro, plus the fix when it's clear |
 | `gear-respec` | You | Runs the retro and proposes what to add and delete |
 | `scribe-as-me` (`bard`) | You | Drafts text published under your name, and never posts it |
+| `unraid` (`homelab`) | Claude | Deploys and inspects containers on an unRAID server, and reads your local notes for that server's facts |
 
 The five hooks check your configuration at session start, send desktop notifications on stop and on input needed (two hooks), format files where the repo uses prettier or ruff, and run `review-gate`. That last one blocks a stop once per batch of work when two or more files changed since the last `review-party`, so Claude reviews multi-file work before calling it done. Work that's nothing but prose docs passes.
 

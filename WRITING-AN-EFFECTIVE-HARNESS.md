@@ -92,9 +92,21 @@ An installer merges one JSON profile into `~/.claude/settings.json`, and the rep
 
 If your marketplace repo is private, expect one more chore. A `github` source clones over HTTPS, and the CLI turns off credential helpers for some background git calls, so a background refresh can fail. Either register an SSH key, or use a `git` source and set `CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1` so a failed refresh keeps the existing clone.
 
+### Keep your own machine out of the kit
+
+A public kit can stay generic if a private companion repo holds your specifics. The two layers join in three places, and no file holds both:
+
+- **Settings, at install time.** `install.sh <profile> --machine <file>` merges the public profile, then the private one. Arrays are unioned, because `jq`'s `*` would replace them and drop entries. That's how a machine keeps its model, its effort level and its trim out of the public repo.
+- **Plugins, side by side.** The private repo can be a second marketplace, with its own namespace, or it can copy typed-only skills into `~/.claude/skills/`.
+- **Knowledge, at read time.** A public skill says to read `~/.config/loadout/notes/<topic>.md` if it exists. Notes add facts and never repeat the procedure, so the skill works without them.
+
+The `unraid` skill in the `homelab` plugin shows the third: pool names and addresses are placeholders until a notes file fills them in. Reading a file outside the project needs permission, so the profiles allow `Read(~/.config/loadout/notes/**)`. Without that rule, a `dontAsk` session denies the read, and the skill falls back to placeholders. Copy notes into place instead of linking them, because a rule on the notes path doesn't cover a link's target. Read notes with plain file reading: I tried `!` shell injection for this first, and the skill errored when it loaded them.
+
+A fork needs none of this: with no `--machine` file and no notes, every public skill still works.
+
 ## 3. Give every surface a budget
 
-Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share and skill descriptions, from November 1.
+Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, skill bodies and skill descriptions, from November 1.
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
@@ -102,9 +114,9 @@ Every always-on surface gets a target and a ceiling. The "Now" column is from Oc
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 532 tokens | Anthropic's built-in styles run 250 to 370 tokens, more with examples |
 | User CLAUDE.md | About 30 lines | 200 lines | 30 lines | The docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, pitfalls |
-| SKILL.md body | Under 150 lines | 500 lines | At most 56 lines | The docs: "Keep `SKILL.md` under 500 lines" |
+| SKILL.md body | Under 150 lines | 500 lines | At most 130 lines | The docs: "Keep `SKILL.md` under 500 lines" |
 | One skill description | | 200 characters | 132 to 188 | The listing budget in [section 5](#5-equip-skills-that-fire) |
-| All harness descriptions | | 5,000 characters | 1,791 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
+| All harness descriptions | | 5,000 characters | 1,969 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
 | Session-start output | Nothing on a configured machine | 300 characters | 0 | Re-sent after every compaction; checked by hand, not linted |
 
 The 200-line ceiling rests on token cost, not adherence. A factorial study found compliance of 60.0, 65.2, 67.7, and 64.0% at 25, 100, 250, and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still warn that "Bloated CLAUDE.md files cause Claude to ignore your actual instructions!" ([best practices](https://code.claude.com/docs/en/best-practices)).
@@ -137,7 +149,7 @@ Every enabled skill puts its name and description into every session. The space 
 
 Going over budget doesn't remove anything. The lowest-scoring skills lose their description and show as a bare name, and subagents on 200k models see that cut list. The score is uses times max(0.5^(days since use / 7), 0.1). A skill with `disable-model-invocation: true` stays out of the listing entirely.
 
-So keep each description under 200 characters, and say what the skill does and when to use it. On November 1, 2026, my eleven skills hold 1,791 characters, and the seven the model can pick hold 1,222. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
+So keep each description under 200 characters, and say what the skill does and when to use it. On November 1, 2026, my twelve skills hold 1,969 characters, and the eight the model can pick hold 1,400. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
 
 Signing in with a claude.ai account adds that account's enabled skills and connectors to every Claude Code session, on every machine, and they don't show up in your plugin list. Mine cost 7,038 of a 9,016 share. You can trim them per machine in `~/.claude/settings.json` without changing the account:
 
@@ -154,7 +166,7 @@ Beware of skills that shout. superpowers cost about 2,540 tokens per session and
 
 Check a new skill's name against the bundled skills before you write it, because the model will pick the bundled one. And if something must always happen, a description can't promise it. Self-review here is a hook: `review-gate` blocks a stop once per batch of work when two or more files changed since the last review.
 
-Keep bodies short. Mine run 4 to 56 lines, and `review-party` keeps each reviewer's brief in a reference file beside `SKILL.md`, so the team costs nothing until it runs.
+Keep bodies short. Mine run 4 to 130 lines, and `review-party` keeps each reviewer's brief in a reference file beside `SKILL.md`, so the team costs nothing until it runs.
 
 Name for the menu, too. My names lead with their subject (`gear-`, `map-`, `review-`), so the alphabetical slash menu groups them, and they end with a word of flavor.
 

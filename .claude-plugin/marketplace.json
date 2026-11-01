@@ -14,6 +14,11 @@
       "name": "bard",
       "source": "./plugins/bard",
       "description": "An opinionated voice, optional: the peer output style (forced while enabled) and scribe-as-me for text published under your name."
+    },
+    {
+      "name": "homelab",
+      "source": "./plugins/homelab",
+      "description": "Optional skills for running your own server. Machine-specific facts stay in local notes, outside the plugin."
     }
   ]
 }

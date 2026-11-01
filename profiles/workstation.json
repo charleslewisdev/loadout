@@ -8,10 +8,16 @@
   },
   "enabledPlugins": {
     "loadout@loadout": true,
-    "bard@loadout": true
+    "bard@loadout": true,
+    "homelab@loadout": true
   },
   "outputStyle": "bard:peer",
   "cleanupPeriodDays": 120,
+  "permissions": {
+    "allow": [
+      "Read(~/.config/loadout/notes/**)"
+    ]
+  },
   "env": {
     "CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE": "1"
   },

@@ -1,0 +1,23 @@
+# The unraid skill reads local notes when they exist. The planted pool name appears
+# nowhere else, so an answer holding it came from the notes. The eval sandbox moves HOME and the
+# skill's path shows the real one, so the prompt says where it is. Run with --scaffold.
+schema_version: "1.1"
+name: unraid-with-notes
+tags: [unraid]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 8
+  timeout_seconds: 180
+  allowed_tools: [Skill, Read, Glob, Grep]
+  prompt: "On my unRAID server, what host path should a Postgres container use for its data? It needs low-latency I/O. Give me the exact path. My home directory is the parent of the current directory."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: unraid
+    arm: with-only
+  - name: uses-the-notes
+    type: llm
+    criteria: "Pass only if the final reply gives a path under /mnt/saltmarsh_fast/."

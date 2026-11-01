@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Merge a machine profile into ~/.claude/settings.json and register the marketplace.
 #
-#   ./install.sh <profile> [--no-register] [--ref <branch>]
+#   ./install.sh <profile> [--machine <file>] [--no-register] [--ref <branch>]
 #
 # Backs up settings.json to ~/.claude/backups/, then deep-merges
-# profiles/<profile>.json over it with `jq -s '.[0] * .[1]'`: profile keys win and
-# every other key is kept, except the marketplace source, which is replaced whole.
+# profiles/<profile>.json over it: profile keys win, arrays are unioned, and every
+# other key is kept, except the marketplace source, which is replaced whole. A union
+# only adds, so retiring an array entry means deleting it from settings.json by hand.
+# --machine merges a private profile over the public one first, the same way, so
+# one machine's settings can live outside this repo.
 # "$HOME" in a profile string becomes this machine's home.
 # The marketplace source comes from this checkout's origin remote, so a fork
 # installs from the fork: a GitHub origin becomes a github source, anything else
@@ -26,10 +29,12 @@ usage() { awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" 
 
 here=$(cd "$(dirname "$0")" && pwd)
 profile=''
+machine=''
 register=1
 ref=''
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --machine) [[ $# -ge 2 ]] || usage; machine=$2; shift 2 ;;
     --no-register) register=0; shift ;;
     --ref) [[ $# -ge 2 ]] || usage; ref=$2; shift 2 ;;
     -*) usage ;;
@@ -39,26 +44,41 @@ done
 [[ -n $profile ]] || usage
 src="$here/profiles/$profile.json"
 [[ -r $src ]] || { echo "install: no profile at profiles/$profile.json" >&2; exit 2; }
+[[ -z $machine || -r $machine ]] || { echo "install: no machine profile at $machine" >&2; exit 2; }
+
+# jq's `*` replaces arrays, which would drop any permissions.allow entry that isn't
+# in the newer layer, so this keeps the older entries and appends the new ones.
+merge_def='def merge($b): . as $a
+  | if ($a | type) == "object" and ($b | type) == "object" then
+      reduce ($b | keys_unsorted[]) as $k ($a; .[$k] = (if has($k) then (.[$k] | merge($b[$k])) else $b[$k] end))
+    elif ($a | type) == "array" and ($b | type) == "array" then $a + ($b - $a)
+    else $b end;'
 
 settings="$HOME/.claude/settings.json"
 mkdir -p "$HOME/.claude/backups"
 [[ -f $settings ]] || echo '{}' >"$settings"
 cp -p "$settings" "$(mktemp "$HOME/.claude/backups/settings.json.$(date +%Y%m%dT%H%M%S).XXXX")"
+# Checked first: with nothing to read, or a non-object, the merge below would succeed
+# and write the wrong file.
+grep -q '[^[:space:]]' "$settings" || echo '{}' >"$settings"
+jq -e 'type == "object"' "$settings" >/dev/null 2>&1 ||
+  { echo "install: ~/.claude/settings.json isn't a JSON object, so it was left alone" >&2; exit 2; }
 
 origin=$(git -C "$here" remote get-url origin 2>/dev/null) ||
   { echo "install: this checkout has no origin remote to install from" >&2; exit 2; }
 gh_repo=$(sed -nE 's#^(https://([^/@]*@)?github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)$#\3#p' <<<"$origin")
 gh_repo=${gh_repo%.git}
+layered=$(jq -s "$merge_def"' (.[1] // {}) as $m | .[0] | merge($m)' "$src" "${machine:-/dev/null}")
 wanted=$(jq --arg home "$HOME" --arg ref "$ref" --arg repo "$here" --arg origin "$origin" --arg gh "$gh_repo" '
   walk(if type == "string" then gsub("\\$HOME"; $home) else . end)
   | .extraKnownMarketplaces.loadout.source = (
       (if $gh != "" then {source: "github", repo: $gh} else {source: "git", url: $origin} end)
       + {ref: (.extraKnownMarketplaces.loadout.source.ref // "main")})
   | if $ref != "" then .extraKnownMarketplaces.loadout.source.ref = $ref else . end
-  | .env.LOADOUT_REPO = $repo' "$src")
+  | .env.LOADOUT_REPO = $repo' <<<"$layered")
 # The marketplace source is replaced whole: merged key by key, a git source's url
 # would survive next to a github source's repo.
-merged=$(jq -s '.[1] as $p | (.[0] * $p) | .extraKnownMarketplaces.loadout.source = $p.extraKnownMarketplaces.loadout.source' "$settings" - <<<"$wanted")
+merged=$(jq -s "$merge_def"' .[1] as $p | (.[0] | merge($p)) | .extraKnownMarketplaces.loadout.source = $p.extraKnownMarketplaces.loadout.source' "$settings" - <<<"$wanted")
 if [[ $merged != "$(cat "$settings")" ]]; then
   printf '%s\n' "$merged" >"$settings"
   echo "install: merged profiles/$profile.json into ~/.claude/settings.json"

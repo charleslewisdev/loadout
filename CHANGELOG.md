@@ -14,6 +14,8 @@
 
 ### Added
 
+- `install.sh --machine <file>` layers a private profile over a public one, and array settings are now unioned instead of replaced.
+- The `homelab` plugin, with a generic `unraid` skill that reads local notes from `~/.config/loadout/notes/`. The profiles allow reading that path.
 - `docs/public-repo-standard.md`, one checklist for every public repo, with `scripts/check` enforcing the items a script can check.
 - A code of conduct, issue and pull request templates, Dependabot for actions, and REUSE licensing.
 - Reviewed exceptions for `guard/scan`, kept beside the private denylist and keyed on content.

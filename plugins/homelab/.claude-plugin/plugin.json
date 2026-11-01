@@ -1,0 +1,8 @@
+{
+  "name": "homelab",
+  "version": "0.1.0",
+  "description": "Optional skills for running your own server. Machine-specific facts stay in local notes, outside the plugin.",
+  "author": {
+    "name": "charleslewisdev"
+  }
+}

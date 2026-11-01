@@ -9,6 +9,11 @@
   "enabledPlugins": {
     "loadout@loadout": true
   },
+  "permissions": {
+    "allow": [
+      "Read(~/.config/loadout/notes/**)"
+    ]
+  },
   "env": {
     "CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE": "1"
   },

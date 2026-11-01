@@ -1,0 +1,19 @@
+# With no notes file, the unraid skill still works, and doesn't invent a pool name.
+schema_version: "1.1"
+name: unraid-without-notes
+tags: [unraid]
+runs: 3
+execution:
+  max_turns: 8
+  timeout_seconds: 180
+  allowed_tools: [Skill, Read, Glob, Grep]
+  prompt: "On my unRAID server, what host path should a Postgres container use for its data? It needs low-latency I/O."
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: unraid
+    arm: with-only
+  - name: uses-a-placeholder
+    type: llm
+    criteria: "Pass only if the reply recommends a direct pool path and treats the pool name as a placeholder or something to confirm, such as /mnt/<pool-name>/. Fail if it states a specific pool name as fact, or refuses because a notes file is missing."
