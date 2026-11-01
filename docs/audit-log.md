@@ -88,3 +88,28 @@ The share is now under the 6,000 ceiling, and the share without connectors is un
 | `session-start` | 43.1 | 39.2 |
 
 **Skill usage and eval results:** no kit skill changed, so there's no new table.
+
+## 2026-11-01: private profile and `homelab`
+
+**CLI:** 2.1.316, on Haiku, three usable runs per configuration.
+
+**Why:** the first install of the private profile and the `homelab` plugin, which took the `unraid` skill out of the personal skills.
+
+**What changed:** `homelab` added 73 tokens, and the personal skills lost 70, so the move cost 3. The other 269 of the 272 rise is an override that stopped working. A synced skill was set to `off` under `skillOverrides` in user settings, and the profile then installed a typed-only personal copy with the same name. That key now hides the personal copy and misses the synced one. Passing the same key with `--settings` still reaches the synced skill, which is how I measured the 269. The next entry should show it gone once the synced copy is deleted from the account.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Harness share, with connectors | 4,608 | 4,880 |
+| Harness share, without connectors | 2,916 | 3,187 |
+| Vendor floor | 16,972 | 16,972 |
+| Account-synced skills (16) | 868 | 1,137 |
+| Account connectors | 1,693 | 1,693 |
+| `bard` plugin | 728 | 728 |
+| User CLAUDE.md | 643 | 643 |
+| `loadout` plugin | 469 | 469 |
+| `homelab` plugin | 0 | 73 |
+| Personal skills and the rest | 207 | 137 |
+
+Before takes the two shares and the `loadout` row from a 0.9.0 run, and the other rows from the first trim. The rest includes `rust-analyzer-lsp` at 4 tokens, as earlier entries do.
+
+**Hook p95, skill usage and eval results:** no hook or kit skill changed, so there's no new table.

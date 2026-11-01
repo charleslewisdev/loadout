@@ -54,7 +54,7 @@ The floor is Claude Code's own system prompt, built-in tools, and bundled skills
 | Personal skills and the rest, by subtraction | 207 | 207 |
 | **Harness share** | **9,016** | **4,539** |
 
-Most of the cost came from the account, not the harness. Without connectors the share is now 2,846.
+Most of the cost came from the account, not the harness. Without connectors the share was 2,846.
 
 The number is slippery, so read yours with care. Use `--safe-mode` for the floor, because `--tools ""` also strips 15,600 tokens of built-in tools. Keep the auto-memory section out of the ceiling if you've chosen to run it, so the budget doesn't punish a decision you made on purpose.
 
@@ -110,7 +110,7 @@ Every always-on surface gets a target and a ceiling. The "Now" column is from Oc
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
-| Harness share | About 3,000 tokens | 6,000 tokens | 4,608 | About 3% of a 200k window above the vendor floor |
+| Harness share | About 3,000 tokens | 6,000 tokens | 4,880 | About 3% of a 200k window above the vendor floor |
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 532 tokens | Anthropic's built-in styles run 250 to 370 tokens, more with examples |
 | User CLAUDE.md | About 30 lines | 200 lines | 30 lines | The docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, pitfalls |

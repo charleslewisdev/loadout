@@ -21,7 +21,10 @@ Check these on the repo's Settings page, or with `gh api`:
 | Secret scanning and push protection | The repo itself, under `security_and_analysis` |
 | Dependabot alerts | `vulnerability-alerts`, where 204 means on |
 | Private vulnerability reporting | `private-vulnerability-reporting` |
-| Branch protection | `branches/main/protection` |
+| Branch protection, classic | `branches/main/protection` |
+| Branch protection, ruleset | `rules/branches/main`, which lists the rules that apply |
+
+Each protection endpoint sees only its own kind, so a 404 from the first or `[]` from the second doesn't mean `main` is unprotected. Start with `protected` on `branches/main`, then read whichever one applies. A ruleset passes with `required_status_checks` and `non_fast_forward` in the list.
 
 - [ ] Secret scanning is on.
 - [ ] Push protection is on.
