@@ -40,20 +40,21 @@ claude -p "Reply with exactly the word OK and nothing else." --model haiku --out
 | Vendor floor | `--safe-mode` | 17,859 | 17,712 | 16,973 | 16,973 |
 | **Harness share** | auto-memory off minus the floor | **4,474** | **3,283** | **5,986** | **9,016** |
 
-The last two columns are the same setup a day apart. The October figure missed connectors, and the November figure doesn't, so older columns may undercount too. Each harness audit since then has an entry in the [audit log](docs/audit-log.md).
+The last two columns are the same setup a day apart, both before the trim in [section 5](#5-equip-skills-that-fire). The October figure missed connectors, and the November figure doesn't, so older columns may undercount too. Each harness audit since then has an entry in the [audit log](docs/audit-log.md).
 
-The floor is Claude Code's own system prompt, built-in tools, and bundled skills. The ceiling is 6,000 tokens, and the target is about 3,000. So yes, the right-hand column is a problem. Here's where it goes on November 1, 2026:
+The floor is Claude Code's own system prompt, built-in tools, and bundled skills. The ceiling is 6,000 tokens, and the target is about 3,000. Here's where the share went on November 1, 2026, before and after the trim in [section 5](#5-equip-skills-that-fire):
 
-| Surface | Tokens |
-| --- | --- |
-| Account-synced skills, 16 of them | 4,008 |
-| Account connectors, 5 of them | 3,030 |
-| `bard` plugin, including the output style | 728 |
-| User CLAUDE.md | 643 |
-| `loadout` plugin | 400 |
-| Personal skills and the rest, by subtraction | 207 |
+| Surface | Before | After |
+| --- | --- | --- |
+| Account-synced skills, 16 of them | 4,008 | 868 |
+| Account connectors | 3,030 | 1,693 |
+| `bard` plugin, including the output style | 728 | 728 |
+| User CLAUDE.md | 643 | 643 |
+| `loadout` plugin | 400 | 400 |
+| Personal skills and the rest, by subtraction | 207 | 207 |
+| **Harness share** | **9,016** | **4,539** |
 
-Most of the share comes from the account, not the harness. Trimming that is the first job for the next retro.
+Most of the cost came from the account, not the harness. Without connectors the share is now 2,846.
 
 The number is slippery, so read yours with care. Use `--safe-mode` for the floor, because `--tools ""` also strips 15,600 tokens of built-in tools. Keep the auto-memory section out of the ceiling if you've chosen to run it, so the budget doesn't punish a decision you made on purpose.
 
@@ -97,7 +98,7 @@ Every always-on surface gets a target and a ceiling. The "Now" column is from Oc
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
-| Harness share | About 3,000 tokens | 6,000 tokens | 9,016 | About 3% of a 200k window above the vendor floor |
+| Harness share | About 3,000 tokens | 6,000 tokens | 4,539 | About 3% of a 200k window above the vendor floor |
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 532 tokens | Anthropic's built-in styles run 250 to 370 tokens, more with examples |
 | User CLAUDE.md | About 30 lines | 200 lines | 30 lines | The docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, pitfalls |
@@ -136,7 +137,16 @@ Every enabled skill puts its name and description into every session. The space 
 
 Going over budget doesn't remove anything. The lowest-scoring skills lose their description and show as a bare name, and subagents on 200k models see that cut list. The score is uses times max(0.5^(days since use / 7), 0.1). A skill with `disable-model-invocation: true` stays out of the listing entirely.
 
-So keep each description under 200 characters, and say what the skill does and when to use it. On October 31, 2026, my ten skills hold 1,626 characters, and the six the model can pick hold 1,048. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. Removing skills saved little: taking out 14 cut 3,717 characters of descriptions, and the share rose by 15 tokens. The real cost of an over-budget listing is the descriptions that get cut.
+So keep each description under 200 characters, and say what the skill does and when to use it. On October 31, 2026, my ten skills hold 1,626 characters, and the six the model can pick hold 1,048. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
+
+Signing in with a claude.ai account adds that account's enabled skills and connectors to every Claude Code session, on every machine, and they don't show up in your plugin list. Mine cost 7,038 of a 9,016 share. You can trim them per machine in `~/.claude/settings.json` without changing the account:
+
+- **`skillOverrides`** maps a skill name to `on`, `name-only`, `user-invocable-only` or `off`.
+- **`deniedMcpServers`** takes `{"serverName": "<name>"}` entries, and a blocked connector costs nothing.
+
+Decide with evidence: count each skill and connector's tool calls in your transcripts, and use `scripts/budget` to measure each connector and the skills as a group. I found one connector doing all the work, with 145 calls in 195 transcripts, and four with none. Of 16 skills, 2 appeared in those transcripts at all. That took the share from 9,016 to 4,539 tokens.
+
+`name-only` has a price. It keeps a skill typeable and cuts most of its cost, but the model mostly stops choosing it. On Haiku, automatic use of four skills fell from 11 runs of 12 to 5 of 15, counting one repeated skill. Use it for skills you'd type anyway, and leave `on` anything you rely on the model to pick. Test the skills you keep in a fresh session.
 
 Treat every outside skill as unidentified loot: it arrives with `disable-model-invocation: true` and earns its way into the listing. A practitioner's three skill audits reached the same rule: "Disable unused skills the moment they're added." ([dev.to](https://dev.to/shimo4228/15-days-of-skill-sprawl-in-claude-code-lessons-from-3-audits-27em)). A skill written here gets invoked once by name after it lands, so its usage score starts above zero.
 
@@ -296,7 +306,7 @@ So I started over on September 21, 2026, and the first thing I built was a numbe
 
 Then the evals went to work on my own ideas. Five style rules fell, two skills failed to fire, and the share dropped to 3,283 tokens once the legacy setup was gone. superpowers was disabled the day its replacements landed. Uninstalling the old setup turned out to be the easy part, because private names were still scattered all over the machine, and `guard/scan --path` exists because of that. The first retro proposed no repository changes. Its work was memory, cutting the two largest indexes from 156 and 144 lines to 21 and 19.
 
-Crystal Bridge grew up alongside it, and in late October the notify hook learned to stay quiet under its sessions. Then I got the repo ready for strangers: guardrails on anything that publishes, skills renamed to group in the slash menu, `bard` split out so the voice is optional, and the review gate. By the end of October the share had climbed to a reported 5,986, which section 1 shows was really 9,016 once connectors counted, with skills synced to my account as the largest piece, which is exactly why the retro is on a schedule.
+Crystal Bridge grew up alongside it, and in late October the notify hook learned to stay quiet under its sessions. Then I got the repo ready for strangers: guardrails on anything that publishes, skills renamed to group in the slash menu, `bard` split out so the voice is optional, and the review gate. By the end of October the share had climbed to a reported 5,986, which section 1 shows was really 9,016 once connectors counted, with skills synced to my account as the largest piece, which is exactly why the retro is on a schedule. A trim on November 1 brought it down to 4,539.
 
 ### What I got wrong
 

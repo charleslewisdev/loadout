@@ -10,6 +10,7 @@
 ### Changed
 
 - `scripts/budget` reports connectors, synced skills, each plugin and the user CLAUDE.md from real on and off runs, replacing the character estimate. The headline share now includes connectors, so it can fail where it used to pass.
+- The guide explains what a claude.ai account adds to each session, how to trim it per machine, and what `name-only` costs.
 
 ### Added
 

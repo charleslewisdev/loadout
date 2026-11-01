@@ -14,13 +14,13 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 
 | Stat | Value | In plain words |
 | --- | --- | --- |
-| **Encumbrance** | 9,016 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
+| **Encumbrance** | 4,539 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
 | **Inventory** | 9 skills, plus 1 in `bard` | Procedures Claude picks up when they apply, or that you type |
 | **Reflexes** | 5 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
 | **Save point** | Every 90 days at most | A retro that opens one pull request of additions and deletions |
 
-Yes, that's over the ceiling, and the number is new. Until November 2026 `scripts/budget` could miss account connectors, and it reported 5,986. The `loadout` plugin is 400 of the total, `bard` is 728, and skills and connectors from my Claude account are 7,038. Trimming those is the next job, and the [audit log](docs/audit-log.md) keeps score.
+Until November 2026 `scripts/budget` could miss account connectors, and it reported 5,986. The true figure was 9,016, over the ceiling, and most of it came from my Claude account, not this repo. Trimming the account's skills and connectors per machine brought it down, and the [audit log](docs/audit-log.md) keeps score. The `loadout` plugin is 400 of the total, and `bard` is 728.
 
 > [!NOTE]
 > **About the evidence.** Every number here comes from a command I ran, or carries a link. Rules I could test had to change Claude's behavior in a with-and-without eval to stay, [the guide](WRITING-AN-EFFECTIVE-HARNESS.md) lists the exceptions, and [the eval results](docs/eval-results.md) show the latest score for every case. Anything marked **opinion** is my taste, not how Claude Code behaves.

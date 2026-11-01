@@ -52,3 +52,39 @@ Repeated runs agreed within 2 tokens, with no runs discarded. The share is over 
 | `gear-mend`, `gear-respec`, `scribe-as-me` | 0 |
 
 **Eval results:** of 31 cases, 17 pass, 6 score below 0.80, 5 aren't trusted because Bash fails in the eval sandbox, and 3 haven't run. See [eval-results.md](eval-results.md).
+
+## 2026-11-01: first trim
+
+**CLI:** 2.1.316, on Haiku, three usable runs per configuration.
+
+**Why:** the baseline share was over both ceilings, and most of it came from the claude.ai account.
+
+**What changed:** on this machine, 14 of 16 account-synced skills moved to `name-only`, `user-invocable-only` or `off`, and 4 of 5 connectors were blocked or removed. Choices came from usage: one connector had 145 tool calls in 195 transcripts, the others none, and 2 of the 16 skills appeared in those transcripts. The user CLAUDE.md and the `peer` style were reviewed and left alone, since each is within its target.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Total at turn 0, with connectors and auto-memory | 26,681 | 22,202 |
+| Harness share, with connectors | 9,016 | 4,539 |
+| Harness share, without connectors | 5,986 | 2,846 |
+| Vendor floor | 16,973 | 16,972 |
+| Auto-memory section, outside the share | 693 | 692 |
+| Account-synced skills (16) | 4,008 | 868 |
+| Account connectors | 3,030 | 1,693 |
+| `bard` plugin | 728 | 728 |
+| User CLAUDE.md | 643 | 643 |
+| `loadout` plugin | 400 | 400 |
+| Personal skills and the rest | 207 | 207 |
+
+The share is now under the 6,000 ceiling, and the share without connectors is under 3,000. The guide's target of about 3,000 for the full share isn't met yet. Automatic use of four `name-only` skills fell from 11 runs of 12 to 5 of 15, counting one repeated skill. I accepted that because none of the four had a tool call in those transcripts. The test itself added to their lifetime usage counts, so ignore that bump at the next retro. The two skills left `on` still fired, in 5 runs of 6.
+
+**Hook p95, last 90 days.** No hook changed, so these differences are measurement noise.
+
+| Hook | Before ms | After ms |
+| --- | --- | --- |
+| `format` | 185.2 | 185.2 |
+| `notify-input` | 58.2 | 58.2 |
+| `notify-stop` | 51.6 | 48.3 |
+| `review-gate` | 121.2 | 97.4 |
+| `session-start` | 43.1 | 39.2 |
+
+**Skill usage and eval results:** no kit skill changed, so there's no new table.
