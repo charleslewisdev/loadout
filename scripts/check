@@ -11,7 +11,7 @@
 #      it exists (never in CI)
 #   4. plugin, marketplace and skill names against guard/forbidden-names
 #   5. the statusline, notify, session-start, review gate, gh publication hook and guard/scan tests, and guard/scan --path and retro-evidence on synthetic homes
-#   6. install.sh on a synthetic home, scripts/budget and scripts/eval against a stub claude, and vale on published
+#   6. install.sh and gear-outfit's script on a synthetic home, scripts/budget and scripts/eval against a stub claude, and vale on published
 #      docs where it is installed
 #   7. every retro since the audit log began has an entry in docs/audit-log.md
 #   8. the machine-checkable items of docs/public-repo-standard.md
@@ -116,6 +116,14 @@ install_tests() {  # print only the failed assertions, keep the suite's status
   local out rc=0
   out=$(scripts/install.test.sh 2>&1) || rc=$?
   ((rc == 0)) || grep 'FAIL' <<<"$out"
+  return "$rc"
+}
+
+outfit_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(scripts/outfit.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep 'FAIL' <<<"$out"
+  grep 'skipped' <<<"$out" || true
   return "$rc"
 }
 
@@ -320,6 +328,7 @@ step 'retro-evidence on a synthetic home' retro_evidence_test
 step 'guard/scan --path on a synthetic tree' path_scan_test
 step 'install layering tests' install_tests
 step 'budget script tests' budget_tests
+step 'gear-outfit tests' outfit_tests
 step 'eval wrapper tests' eval_tests
 step 'audit log covers every retro' audit_log_current
 step 'prose lint' prose_lint

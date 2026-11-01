@@ -31,6 +31,7 @@ The newest score for every eval case, written by `scripts/eval-summary --untrust
 | unraid-without-notes | homelab | no | 1.00 | 2026-11-01 | 2.1.316 |
 | bug-hunt-smoke | loadout | yes | not trusted | 2026-10-30 | 2.1.312 |
 | gear-mend-smoke | loadout | yes | not run | | |
+| gear-outfit-smoke | loadout | yes | not run | | |
 | gear-respec-smoke | loadout | yes | not run | | |
 | lore-scribe-readme | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |
 | lore-scribe-voice-default | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |

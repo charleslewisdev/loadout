@@ -1,2 +1,5 @@
 # claude plugin eval output: transcripts and an HTML report
 **/evals/results/
+
+# Private to this checkout
+CLAUDE.local.md

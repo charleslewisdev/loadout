@@ -1,0 +1,201 @@
+{
+  "_about": "What gear-outfit recommends for each answer. Forks replace this file. Each entry is a plan line without accepted, and means says what changes in practice.",
+  "questions": {
+    "autonomy": {
+      "ask": "How much should Claude do before checking with you?",
+      "answers": {
+        "check-in": {
+          "why": "You want to see each risky action",
+          "lines": [
+            {
+              "path": [
+                "permissions",
+                "defaultMode"
+              ],
+              "op": "set",
+              "value": "default",
+              "means": "Sessions ask before each risky action, in place of the classifier"
+            }
+          ]
+        },
+        "auto": {
+          "why": "A classifier decides what needs you, so routine work doesn't stop",
+          "lines": [
+            {
+              "path": [
+                "permissions",
+                "defaultMode"
+              ],
+              "op": "set",
+              "value": "auto",
+              "means": "Sessions start in auto mode, where a classifier blocks risky actions and the rest run without a prompt. It's already the default on recent versions, so this pins it"
+            }
+          ]
+        }
+      }
+    },
+    "git-and-prs": {
+      "ask": "May Claude push branches and open PRs without asking?",
+      "answers": {
+        "ask-first": {
+          "why": "Publishing stays your call",
+          "lines": []
+        },
+        "own-repos": {
+          "why": "Work in repos you own shouldn't stop for a prompt",
+          "lines": [
+            {
+              "path": [
+                "autoMode",
+                "environment"
+              ],
+              "op": "add",
+              "value": [
+                "**Source control**: also trusted: <your GitHub organizations>"
+              ],
+              "means": "The classifier treats these organizations as yours, so writing to their issues and PRs stops counting as an external write"
+            }
+          ]
+        }
+      }
+    },
+    "cost-versus-quality": {
+      "ask": "Which matters more, cost or the best answer?",
+      "answers": {
+        "cost": {
+          "why": "A lower effort level spends less on routine work",
+          "lines": [
+            {
+              "path": [
+                "modelSettings",
+                "<model id>",
+                "effortLevel"
+              ],
+              "op": "set",
+              "value": "medium",
+              "means": "Sessions on this model think less by default, and you can raise it per session"
+            }
+          ]
+        },
+        "quality": {
+          "why": "A higher effort level suits hard work",
+          "lines": [
+            {
+              "path": [
+                "modelSettings",
+                "<model id>",
+                "effortLevel"
+              ],
+              "op": "set",
+              "value": "xhigh",
+              "means": "Sessions on this model think harder by default, and cost more"
+            }
+          ]
+        }
+      }
+    },
+    "stack": {
+      "ask": "Which languages do you work in? Check what's on the machine first.",
+      "answers": {
+        "typescript": {
+          "why": "A language server gives Claude symbols and diagnostics, at almost no startup cost",
+          "note": "Needs typescript-language-server, and a project-level typescript that ships tsserver. TypeScript 7 doesn't.",
+          "lines": [
+            {
+              "path": [
+                "enabledPlugins",
+                "typescript-lsp@claude-plugins-official"
+              ],
+              "op": "set",
+              "value": true,
+              "means": "Claude can ask the TypeScript server about code"
+            }
+          ]
+        },
+        "python": {
+          "why": "A language server gives Claude symbols and diagnostics, at almost no startup cost",
+          "note": "Needs pyright.",
+          "lines": [
+            {
+              "path": [
+                "enabledPlugins",
+                "pyright-lsp@claude-plugins-official"
+              ],
+              "op": "set",
+              "value": true,
+              "means": "Claude can ask the Python server about code"
+            }
+          ]
+        },
+        "rust": {
+          "why": "A language server gives Claude symbols and diagnostics, at almost no startup cost",
+          "note": "Needs rust-analyzer.",
+          "lines": [
+            {
+              "path": [
+                "enabledPlugins",
+                "rust-analyzer-lsp@claude-plugins-official"
+              ],
+              "op": "set",
+              "value": true,
+              "means": "Claude can ask the Rust server about code"
+            }
+          ]
+        },
+        "go": {
+          "why": "A language server gives Claude symbols and diagnostics, at almost no startup cost",
+          "note": "Needs gopls.",
+          "lines": [
+            {
+              "path": [
+                "enabledPlugins",
+                "gopls-lsp@claude-plugins-official"
+              ],
+              "op": "set",
+              "value": true,
+              "means": "Claude can ask the Go server about code"
+            }
+          ]
+        }
+      }
+    },
+    "solo-or-team": {
+      "ask": "Is this repo yours alone, or shared with a team?",
+      "answers": {
+        "solo": {
+          "why": "Your own settings are enough",
+          "lines": []
+        },
+        "team": {
+          "why": "Shared rules belong in the repo's .claude/settings.json, which this skill doesn't write",
+          "lines": []
+        }
+      }
+    },
+    "public-or-private": {
+      "ask": "Is your work public, private, or a mix?",
+      "answers": {
+        "private": {
+          "why": "No extra guard is needed",
+          "lines": []
+        },
+        "public": {
+          "why": "State which repos are public, so the classifier judges what's safe to push",
+          "lines": [
+            {
+              "path": [
+                "autoMode",
+                "environment"
+              ],
+              "op": "add",
+              "value": [
+                "**Repository visibility**: <which repos are public>"
+              ],
+              "means": "The classifier knows which pushes publish, without having to guess"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

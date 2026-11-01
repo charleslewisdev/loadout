@@ -1,0 +1,354 @@
+#!/usr/bin/env bash
+# The script behind gear-outfit. The skill reads and proposes, and only the owner applies.
+#
+#   outfit friction [--since yyyy-mm-dd]   denials in transcripts, by rule label
+#   outfit keys [--reference <file>]       settings keys not seen before
+#   outfit remember <key> <answer>         record an answer, so a key is asked once
+#   outfit recommendations                 what to recommend for each answer
+#   outfit show                            the settings outfit can change
+#   outfit review <plan> [--profile <file>]  every line of a plan, for reading
+#   outfit apply <plan> [--profile <file>]   apply the accepted lines, from a terminal
+#
+# A plan is a JSON array of lines:
+#   {"path": ["permissions", "allow"], "op": "add", "value": ["Bash(x)"],
+#    "means": "What changes in practice", "accepted": false}
+# op is set, add (union into a list) or remove (entries from a list, or a whole key
+# when the line has no value). Only a line with accepted exactly true is applied.
+#
+# Plans are written by a session, so the owner has to be able to trust what they read.
+# A plan may only change the paths in `problem` below, with values of the right type, so
+# a key that runs a command or sets the environment can't be in one: edit those by hand.
+# Text holding control characters, odd spacing or an unfilled <placeholder> is refused,
+# since it could hide what a line says. A plan can turn a plugin off, which stops that
+# plugin's hooks, so every plugin line is flagged.
+#
+# apply refuses inside a Claude session or without a terminal, and asks for a typed word.
+# Those checks stop accidents and put the plan in front of the owner. They aren't a
+# security boundary: a process running as you can unset a variable and fake a terminal.
+# The permission system keeps a session away from apply. Read the lines apply prints,
+# since that screen shows what will be written, whatever review said earlier.
+# It backs up each file it changes.
+#
+# Exits 0 on success, 2 on bad input or a refused plan, 3 on a failure to read the
+# settings reference, and 4 when run inside a session or without a terminal.
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")" && pwd)
+config=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
+settings=$config/settings.json
+seen=$HOME/.config/loadout/outfit-seen.json
+reference_url=https://code.claude.com/docs/en/settings-reference.md
+
+die() { echo "outfit: $1" >&2; exit "${2:-2}"; }
+
+# What a plan line may do. Prints why not, or nothing.
+problem='
+def lists: [["autoMode","environment"], ["autoMode","allow"], ["autoMode","soft_deny"],
+  ["permissions","allow"], ["permissions","ask"], ["permissions","deny"]];
+def strings_of: [.. | strings] + [.. | objects | keys[]];
+def in_list($l): . as $v | $l | index([$v]) != null;
+def set_only(ok; $wants):
+  if .op == "add" then "add needs a list" elif .op == "remove" then
+    (if has("value") then "remove takes no value here" else empty end)
+  elif (has("value") and (.value | ok)) then empty else $wants end;
+if (.means | type) != "string" or (.means | test("\\S") | not) then "it has no means"
+elif (strings_of | any(test("[\\p{Cc}\\p{Cf}]"))) then "it holds control characters"
+elif (strings_of | any(length > 500)) then "it holds text over 500 characters"
+elif (strings_of | any(test("[\\x{A0}\\x{115F}\\x{1160}\\x{1680}\\x{2000}-\\x{200A}\\x{2028}\\x{2029}\\x{202F}\\x{205F}\\x{2800}\\x{3000}\\x{3164}\\x{FFA0}]|  "))) then "it holds odd spacing, which could hide text"
+elif (strings_of | any(test("<[A-Za-z][A-Za-z -]*>"))) then "it holds an unfilled <placeholder>"
+elif (.path as $p | lists | index([$p]) != null) then
+  if .op == "set" then "use add or remove on a list"
+  elif ((.value | type) != "array" or (.value | length) == 0 or (.value | all(type == "string")) == false)
+    then "its value must be a list of strings"
+  elif (.op == "remove" and (.value | index(["$defaults"]) != null))
+    then "removing $defaults would replace the built-in rules"
+  else empty end
+elif .path == ["permissions","defaultMode"] then
+  set_only(in_list(["default","acceptEdits","plan","auto"]); "that mode is not one outfit sets")
+elif (.path | length) == 2 and .path[0] == "enabledPlugins" then
+  set_only(type == "boolean"; "its value must be true or false")
+elif (.path | length) == 2 and .path[0] == "skillOverrides" then
+  set_only(in_list(["on","name-only","user-invocable-only","off"]); "that override is not valid")
+elif .path == ["effortLevel"] or ((.path | length) == 3 and .path[0] == "modelSettings" and .path[2] == "effortLevel") then
+  set_only(in_list(["low","medium","high","xhigh"]); "that effort level is not valid")
+elif .path == ["model"] or .path == ["outputStyle"] then
+  set_only(type == "string"; "its value must be a string")
+elif .path == ["language"] then
+  set_only(type == "string" and test("^\\p{L}[\\p{L} -]{0,30}$"); "its value must be a language name, since Claude reads it as an instruction")
+elif .path == ["cleanupPeriodDays"] then
+  set_only(type == "number" and . == floor and . >= 1 and . <= 36500; "its value must be a whole number of days up to 36500, since Claude Code ignores a whole settings file with a bad one")
+elif .path == ["autoCompactWindow"] then
+  set_only(type == "number" and . == floor and . >= 100000 and . <= 1000000; "its value must be a whole number from 100000 to 1000000")
+else "outfit does not change this key, so edit it by hand" end'
+
+# Read once per run, so the lines checked are the lines printed and applied. Sets $plan_json.
+load_plan() {
+  [[ -f ${1:-} && -r ${1:-} ]] || die "no plan at ${1:-(none given)}"
+  (($(wc -c <"$1") <= 65536)) || die "$1 is too long to be a plan"
+  plan_json=$(cat "$1")
+  jq -e 'type == "array" and all(.[]; type == "object"
+      and (.path | type == "array" and length > 0 and all(.[]; type == "string"))
+      and (.op | IN("set", "add", "remove")))' <<<"$plan_json" >/dev/null 2>&1 ||
+    die "$1 isn't a valid plan: each line needs a path list and an op of set, add or remove"
+  local bad
+  bad=$(jq -r "to_entries[] | .key as \$n | .value | ($problem) | \"line \\(\$n + 1): \\(.)\"" <<<"$plan_json")
+  [[ -z $bad ]] || die "this plan is refused, and nothing was changed:"$'\n'"$bad"
+}
+
+# A path with its directories and symlinks resolved. The file may not exist. BSD realpath
+# has no -m, so this is shell.
+resolve() {
+  local p=$1 link i
+  for ((i = 0; i < 40; i++)); do
+    [[ -L $p ]] || break
+    link=$(readlink "$p")
+    if [[ $link == /* ]]; then p=$link; else p=$(dirname "$p")/$link; fi
+  done
+  [[ ! -L $p ]] || die "$1 is a symlink loop"
+  local d
+  d=$(dirname "$p")
+  [[ ! -d $d ]] || d=$(cd "$d" && pwd -P)
+  printf '%s/%s\n' "${d%/}" "$(basename "$p")"
+}
+
+# Prints the JSON object in a file, or {} if it's missing or empty. Never echoes it on failure.
+read_object() {
+  if [[ ! -s $1 ]] || ! grep -q '[^[:space:]]' "$1"; then echo '{}'; return; fi
+  jq 'if type == "object" then . else error("not an object") end' "$1" 2>/dev/null ||
+    die "$1 isn't a JSON object"
+}
+
+# Refuses when a file's existing shape can't take the plan, without printing its values.
+check_shape() {  # $1 file
+  local object bad
+  object=$(read_object "$1")
+  bad=$(jq -r --argjson plan "$plan_json" '. as $s | $plan[] | select(.accepted == true)
+    | .path as $p
+    | (try ($s | getpath($p[:-1]) | type) catch "x") as $parent
+    | (try ($s | getpath($p) | type) catch "x") as $here
+    | select(($parent != "object" and $parent != "null")
+        or ((.value | type) == "array" and $here != "array" and $here != "null"))
+    | $p | tojson' <<<"$object")
+  [[ -z $bad ]] || die "$1 has an unexpected type at: $bad"
+}
+
+apply_jq='reduce ($plan[] | select(.accepted == true)) as $l (.;
+  if $l.op == "set" then setpath($l.path; $l.value)
+  elif $l.op == "add" then
+    (if $l.path[0] == "autoMode" then ["$defaults"] else [] end) as $start
+    | (getpath($l.path) // $start) as $a
+    | setpath($l.path; reduce $l.value[] as $v ($a; if index([$v]) then . else . + [$v] end))
+  elif ($l | has("value")) then
+    if getpath($l.path) == null then . else setpath($l.path; getpath($l.path) - $l.value) end
+  else delpaths([$l.path]) end)'
+
+friction() {
+  local since
+  since=$(date -d '90 days ago' +%F 2>/dev/null || date -v-90d +%F)
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --since) [[ $# -ge 2 ]] || die 'usage: outfit friction [--since yyyy-mm-dd]'; since=$2; shift 2 ;;
+      *) die 'usage: outfit friction [--since yyyy-mm-dd]' ;;
+    esac
+  done
+  [[ $since =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "bad date: $since"
+  if [[ ! -d $config/projects ]]; then echo "No transcripts at $config/projects."; return; fi
+  # A label prints only if it's a known rule, so transcript text can't reach the report.
+  local rules count
+  rules=$(claude auto-mode defaults 2>/dev/null | jq -c '[(.soft_deny + .hard_deny)[]
+    | (capture("^(?<l>[A-Za-z][^:\\[\\n]*?) *(\\[|:)") | .l)?]' 2>/dev/null) || rules='[]'
+  [[ -n $rules ]] || rules='[]'
+  count=$(find "$config/projects" -name '*.jsonl' | wc -l)
+  echo "Denials since $since in $((count)) transcripts, by rule label. Commands aren't shown."
+  echo "An approved prompt leaves no record, so this counts refusals only."
+  [[ $rules != '[]' ]] || echo "The built-in rules couldn't be read, so no rule is named below."
+  { find "$config/projects" -name '*.jsonl' -print0 |
+    xargs -0 grep -h -e 'auto mode classifier' -e "doesn't want to proceed" 2>/dev/null || true; } |
+    jq -Rr --arg since "$since" --argjson rules "$rules" '
+      fromjson? | select(.type == "user" and (.timestamp // "") >= $since)
+      | .message.content | select(type == "array") | .[]
+      | select(.type? == "tool_result" and .is_error == true)
+      | (.content | if type == "string" then . else (map(.text? // "") | join(" ")) end) as $t
+      | if ($t | test("^The user doesn.t want to proceed")) then "You rejected a prompt"
+        elif ($t | test("^Permission for this action (was|has been) denied by the Claude Code auto mode classifier")) then
+          (($t | capture("classifier\\. Reason: \\[(?<l>[^\\]]{1,60})\\]") | .l)? // "") as $l
+          | if ($rules | index([$l])) then $l else "No rule named" end
+        else empty end' |
+    sort | uniq -c | sort -rn | awk '{ n = $1; sub(/^ *[0-9]+ /, ""); printf "%5d  %s\n", n, $0 } END { if (!NR) print "    0  none" }'
+}
+
+keys() {
+  local reference='' body parsed
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --reference) [[ $# -ge 2 ]] || die 'usage: outfit keys [--reference <file>]'; reference=$2; shift 2 ;;
+      *) die 'usage: outfit keys [--reference <file>]' ;;
+    esac
+  done
+  if [[ -n $reference ]]; then
+    body=$(cat "$reference" 2>/dev/null) || die "can't read $reference" 3
+  else
+    body=$(curl -fsSL --max-time 30 "$reference_url" 2>/dev/null) || die "couldn't fetch the settings reference" 3
+  fi
+  # Index rows: | [`key`](#anchor) | description | topic | scope |
+  parsed=$(perl -ne 'if (/^\|\s*\[`([A-Za-z][\w.-]*)`\]\(#[^)]*\)\s*\|.*\|\s*([^|]*?)\s*\|\s*$/) { print "$1\t$2\n" }' <<<"$body")
+  (($(wc -l <<<"$parsed") >= 50)) ||
+    die 'the settings reference has too few keys to trust, so its format may have changed' 3
+  mkdir -p "$(dirname "$seen")"
+  if ! jq -e 'has("_baseline")' "$seen" >/dev/null 2>&1; then
+    local earlier='{}'
+    [[ -s $seen ]] && earlier=$(cat "$seen")
+    cut -f1 <<<"$parsed" | jq -Rn --argjson e "$earlier" '([inputs] | map({(.): "baseline"}) | add) + $e + {_baseline: true}' >"$seen.tmp"
+    mv "$seen.tmp" "$seen"
+    echo "First run: recorded $(wc -l <<<"$parsed") keys as a baseline, so there's nothing new to ask."
+    return
+  fi
+  local new
+  # Managed keys aren't the user's to set, and Global config keys live in another file.
+  new=$(awk -F'\t' '$2 != "Managed" && $2 != "Global config"' <<<"$parsed" | jq -Rr --slurpfile s "$seen" '
+    split("\t")[0] as $k | select($s[0] | has($k) | not) | $k' | sort)
+  if [[ -z $new ]]; then echo "No new settings keys."; else printf '%s\n' "$new"; fi
+}
+
+remember() {
+  [[ $# -eq 2 ]] || die 'usage: outfit remember <key> <answer>'
+  mkdir -p "$(dirname "$seen")"
+  local current='{}' out
+  if [[ -s $seen ]] && grep -q '[^[:space:]]' "$seen"; then current=$(cat "$seen"); fi
+  out=$(jq --arg k "$1" --arg a "$2" '.[$k] = $a' <<<"$current" 2>/dev/null) || die "$seen isn't valid JSON"
+  # A rename replaces a symlink instead of writing through it to another file.
+  printf '%s\n' "$out" >"$seen.tmp"
+  mv "$seen.tmp" "$seen"
+}
+
+recommendations() { cat "$here/recommendations.json"; }
+
+show() {
+  local object
+  object=$(read_object "$settings")
+  jq '{
+    can_change: (try {
+      autoMode: (.autoMode | if . then {environment, allow, soft_deny} else null end),
+      permissions: (.permissions | if . then {defaultMode, allow, ask, deny} else null end),
+      enabledPlugins, skillOverrides, effortLevel, modelSettings, model, language,
+      outputStyle, cleanupPeriodDays, autoCompactWindow
+    } catch "unexpected shape"),
+    other_keys: (keys - ["autoMode", "permissions", "enabledPlugins", "skillOverrides",
+      "effortLevel", "modelSettings", "model", "language", "outputStyle",
+      "cleanupPeriodDays", "autoCompactWindow"])
+  } | .can_change |= (if type == "object" then with_entries(select(.value != null)) else . end)' <<<"$object"
+}
+
+print_lines() {  # $1: all, or accepted
+  local object
+  object=$(read_object "$settings")
+  jq -r --argjson plan "$plan_json" --arg which "$1" '
+    def widens: (.path | tojson) as $p
+      | (.op == "add" and ($p | IN("[\"autoMode\",\"environment\"]", "[\"autoMode\",\"allow\"]", "[\"permissions\",\"allow\"]")))
+        or (.op == "remove" and ($p | IN("[\"autoMode\",\"environment\"]", "[\"autoMode\",\"soft_deny\"]", "[\"permissions\",\"deny\"]", "[\"permissions\",\"ask\"]")))
+        or (.path == ["permissions","defaultMode"]);
+    . as $cur | $plan | to_entries[] | select($which == "all" or .value.accepted == true) | .key as $n | .value as $l
+    | (try ($cur | getpath($l.path)) catch "unexpected shape") as $c
+    | "\($n + 1). \(if $l.accepted == true then "ACCEPTED" else "not accepted" end): \($l.path | tojson)"
+      + (if ($l | widens) then "  WIDENS PERMISSIONS" else "" end)
+      + (if $l.path[0] == "enabledPlugins" then "  STARTS OR STOPS PLUGIN CODE, HOOKS INCLUDED" else "" end)
+      + "\n   \($l.op), current: \($c | tojson)"
+      + "\n   proposed: \(if ($l | has("value")) then ($l.value | tojson) else "delete the whole key" end)"
+      + "\n   means: \($l.means)"
+      + "\n   undo: \(if $l.op == "add" then "remove these entries"
+          elif $l.op == "remove" then "put back the current value above"
+          elif $c == null then "delete this key" else "set it back to the current value above" end)"' <<<"$object"
+}
+
+check_profile() {  # $1 profile: refuses a file that isn't a profile
+  [[ -f $1 ]] || die "no profile at $1"
+  local real
+  real=$(resolve "$1")
+  [[ $(basename "$real") != .claude.json && $real != "$(resolve "$config")"/* ]] ||
+    die "$1 isn't a profile: --profile takes a file of your own, not Claude Code's config"
+  read_object "$1" >/dev/null
+}
+
+review() {
+  local plan='' profile=''
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --profile) [[ $# -ge 2 ]] || die 'usage: outfit review <plan> [--profile <file>]'; profile=$2; shift 2 ;;
+      -*) die 'usage: outfit review <plan> [--profile <file>]' ;;
+      *) plan=$1; shift ;;
+    esac
+  done
+  load_plan "$plan"
+  [[ -z $profile ]] || check_profile "$profile"
+  print_lines all
+  echo
+  echo "To apply the accepted lines, run this yourself, in a terminal outside Claude:"
+  printf '  '
+  [[ -z ${CLAUDE_CONFIG_DIR:-} ]] || printf 'CLAUDE_CONFIG_DIR=%q ' "$CLAUDE_CONFIG_DIR"
+  printf '%q apply %q' "$here/outfit" "$(resolve "$plan")"
+  [[ -z $profile ]] || printf ' --profile %q' "$(resolve "$profile")"
+  echo
+}
+
+write_file() {  # $1 target, $2 content: a failed write leaves the old file whole
+  local real tmp
+  real=$(resolve "$1")
+  mkdir -p "$(dirname "$real")"
+  tmp=$(mktemp "$real.outfit.XXXX")
+  if [[ -f $real ]]; then cp -p "$real" "$tmp"; fi
+  printf '%s\n' "$2" >"$tmp"
+  mv "$tmp" "$real"
+}
+
+backup() {  # $1 file
+  [[ -f $1 ]] || return 0
+  mkdir -p "$config/backups"
+  local b
+  b=$(mktemp "$config/backups/$(basename "$1").$(date +%Y%m%dT%H%M%S).XXXX")
+  cp -p "$1" "$b"
+  echo "outfit: backed up to $b"
+}
+
+apply() {
+  [[ -z ${CLAUDECODE:-} ]] || die 'apply runs only outside a Claude session. Run it in your own terminal.' 4
+  local plan='' profile=''
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --profile) [[ $# -ge 2 ]] || die 'usage: outfit apply <plan> [--profile <file>]'; profile=$2; shift 2 ;;
+      -*) die 'usage: outfit apply <plan> [--profile <file>]' ;;
+      *) plan=$1; shift ;;
+    esac
+  done
+  load_plan "$plan"
+  [[ -z $profile ]] || check_profile "$profile"
+  check_shape "$settings"
+  [[ -z $profile ]] || check_shape "$profile"
+  local object merged profile_object='' profile_merged='' changed=0 count
+  object=$(read_object "$settings")
+  merged=$(jq --argjson plan "$plan_json" "$apply_jq" <<<"$object")
+  [[ $merged == "$object" ]] || changed=1
+  if [[ -n $profile ]]; then
+    profile_object=$(read_object "$profile")
+    profile_merged=$(jq --argjson plan "$plan_json" "$apply_jq" <<<"$profile_object")
+    [[ $profile_merged == "$profile_object" ]] || changed=1
+  fi
+  if ((!changed)); then echo "outfit: nothing to change."; return; fi
+  [[ -t 0 ]] || die 'apply needs a terminal, so you can read the plan before it is written.' 4
+  count=$(jq '[.[] | select(.accepted == true)] | length' <<<"$plan_json")
+  print_lines accepted
+  printf '\nType apply to write %s accepted line(s) to %s%s: ' "$count" "$settings" "${profile:+ and $profile}"
+  local answer=''
+  read -r answer </dev/tty || true
+  [[ $answer == apply ]] || { echo "outfit: nothing applied."; return; }
+  backup "$settings"
+  [[ -z $profile ]] || backup "$profile"
+  write_file "$settings" "$merged"
+  [[ -z $profile ]] || write_file "$profile" "$profile_merged"
+  echo "outfit: applied $count line(s). Start a new session to pick them up."
+}
+
+command -v jq >/dev/null || die 'jq is required'
+case ${1:-} in
+  friction | keys | remember | recommendations | show | review | apply) cmd=$1; shift; "$cmd" "$@" ;;
+  *) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0" >&2; exit 2 ;;
+esac

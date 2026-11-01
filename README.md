@@ -4,7 +4,7 @@
 
 Every Claude Code session starts at level 1. It doesn't know how you like to work, where your repo breaks convention, or what you learned the hard way last month.
 
-loadout is the gear I hand it at the door: ten skills, five hooks, and a statusline, packaged as a plugin marketplace with one installer. Two optional plugins add more: `bard` adds a voice, and `homelab` adds server skills. One of the ten skills is a retro whose favorite move is deleting things.
+loadout is the gear I hand it at the door: eleven skills, five hooks, and a statusline, packaged as a plugin marketplace with one installer. Two optional plugins add more: `bard` adds a voice, and `homelab` adds server skills. One of the eleven skills is a retro whose favorite move is deleting things.
 
 This repo is for you if you use Claude Code every day and your CLAUDE.md has started to look like a junk drawer. Fork it and change it, because a harness is personal and this one is mine. If you're auditing a harness for a team, start with [For a team](#for-a-team).
 
@@ -15,7 +15,7 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 | Stat | Value | In plain words |
 | --- | --- | --- |
 | **Encumbrance** | 4,442 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
-| **Inventory** | 10 skills, plus 1 in `bard` and 1 in `homelab` | Procedures Claude picks up when they apply, or that you type |
+| **Inventory** | 11 skills, plus 1 in `bard` and 1 in `homelab` | Procedures Claude picks up when they apply, or that you type |
 | **Reflexes** | 5 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
 | **Save point** | Every 90 days at most | A retro that opens one pull request of additions and deletions |
@@ -97,6 +97,7 @@ To place something new, ask three questions:
 | `gear-stats` | You | Prints the character sheet |
 | `gear-mend` | You | Logs one annoyance for the next retro, plus the fix when it's clear |
 | `gear-respec` | You | Runs the retro and proposes what to add and delete |
+| `gear-outfit` | You | Recommends settings and permissions from your answers and your real denials, then leaves applying them to you |
 | `scribe-as-me` (`bard`) | You | Drafts text published under your name, and never posts it |
 | `unraid` (`homelab`) | Claude | Deploys and inspects containers on an unRAID server, and reads your local notes for that server's facts |
 
@@ -110,7 +111,7 @@ The five hooks check your configuration at session start, send desktop notificat
 4. Run `review-party` before you call it done.
 5. Run `pr-turn-in` to commit and open the PR.
 
-Outside the ticket, `gear-stats` reads the sheet, `gear-mend` handles anything that annoys you, and `gear-respec` is the periodic save point.
+Outside the ticket, `gear-stats` reads the sheet, `gear-mend` handles anything that annoys you, `gear-respec` is the periodic save point, and `gear-outfit` keeps your settings and permissions current.
 
 ### Add a skill
 

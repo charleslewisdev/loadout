@@ -116,7 +116,7 @@ Every always-on surface gets a target and a ceiling. The "Now" column is from Oc
 | Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, pitfalls |
 | SKILL.md body | Under 150 lines | 500 lines | At most 130 lines | The docs: "Keep `SKILL.md` under 500 lines" |
 | One skill description | | 200 characters | 132 to 188 | The listing budget in [section 5](#5-equip-skills-that-fire) |
-| All harness descriptions | | 5,000 characters | 1,969 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
+| All harness descriptions | | 5,000 characters | 2,126 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
 | Session-start output | Nothing on a configured machine | 300 characters | 0 | Re-sent after every compaction; checked by hand, not linted |
 
 The 200-line ceiling rests on token cost, not adherence. A factorial study found compliance of 60.0, 65.2, 67.7, and 64.0% at 25, 100, 250, and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still warn that "Bloated CLAUDE.md files cause Claude to ignore your actual instructions!" ([best practices](https://code.claude.com/docs/en/best-practices)).
@@ -149,7 +149,7 @@ Every enabled skill puts its name and description into every session. The space 
 
 Going over budget doesn't remove anything. The lowest-scoring skills lose their description and show as a bare name, and subagents on 200k models see that cut list. The score is uses times max(0.5^(days since use / 7), 0.1). A skill with `disable-model-invocation: true` stays out of the listing entirely.
 
-So keep each description under 200 characters, and say what the skill does and when to use it. On November 1, 2026, my twelve skills hold 1,969 characters, and the eight the model can pick hold 1,400. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
+So keep each description under 200 characters, and say what the skill does and when to use it. On November 1, 2026, my thirteen skills hold 2,126 characters, and the eight the model can pick hold 1,400. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
 
 Signing in with a claude.ai account adds that account's enabled skills and connectors to every Claude Code session, on every machine, and they don't show up in your plugin list. Mine cost 7,038 of a 9,016 share. You can trim them per machine in `~/.claude/settings.json` without changing the account:
 
@@ -262,6 +262,8 @@ Harnesses grow unless something pushes back, so the pushback gets a calendar. `/
 The retro works on a `retro/<date>` branch. It reads the friction log, my corrections in recent transcripts, memory files nobody read in 90 days, the budgets, and skill usage, then writes one dated file listing each proposal with its evidence. It ends in one pull request. Nothing reaches rules or skills until I merge it, and changes to local memory wait for my yes. Avoid scheduled rewrites of instruction files, since wholesale rewrites are exactly how files lose instructions and then regrow. If two retro dates pass with nothing produced, the fallback is a calendar reminder to run `/skill-doctor` and delete.
 
 Give a retro skill narrow permissions. `Bash(git *)` pre-approves `git push origin HEAD:main` on an unprotected branch. Unscoped Read, Grep, and Glob pre-approve reading transcripts, and unscoped Edit and Write pre-approve memory edits the procedure said to wait for. Instructions alone don't hold: in sandbox runs the model read files the skill told it not to. List the exact commands a skill needs.
+
+Auto mode is a second permission system with its own settings, so an allow rule won't explain or fix one of its denials. `autoMode.environment` gives it facts it can't know, such as an organization that also counts as source control. Include the literal `"$defaults"` in any `autoMode` array, or that array replaces the built-in rules. Auto mode refuses a session that tries to widen its own permissions, so `/loadout:gear-outfit` writes a plan and leaves applying it to you. Its script refuses to run inside a session, but that only stops accidents, because a process running as you can fake a terminal. The permission system is the boundary.
 
 Small annoyances get their own path. `/loadout:gear-mend` writes one to its own dated file under `retros/friction/`, plus the smallest fix on a branch when the fix is clear, opened as a PR and never merged by the skill. One file per papercut keeps open PRs from conflicting, and the retro reads unmerged papercut branches too.
 
