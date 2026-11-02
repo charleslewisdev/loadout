@@ -1,0 +1,24 @@
+# map-scout surfaces a related repo from gh alone: the fixture plants a canned answer for
+# scripts/eval-bin/gh, and no curated map. Run with --scaffold --allow-tools Bash.
+schema_version: "1.1"
+name: map-scout-portfolio-live
+tags: [map-scout, portfolio]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 8
+  timeout_seconds: 180
+  allowed_tools: [Skill, Bash, Read, Glob, Grep]
+  prompt: "/loadout:map-scout I want our invoicing app to notify customers' systems when an invoice is paid, by calling a URL they register, and to retry when their server is down. Nothing is decided yet. Help me work out the design. There is no repository in this session; answer in your reply."
+graders:
+  - name: ran-the-lookup
+    type: tool_used
+    tool: Bash
+    input_match: map-scout/portfolio
+  - name: surfaced-the-repo
+    type: llm
+    criteria: "Pass only if the reply names hookrelay as a repo that relates to this idea."
+  - name: one-question
+    type: llm
+    criteria: "Pass only if the reply asks the user exactly one question and stops there, without presenting a finished design. A short restatement of the goal, a note on a related repo, or a note on what comes next is fine; offering labeled options for that one question is fine. Asking that same question again in other words at the end, or adding \"or something else?\", still counts as one question. Fail if the reply asks two or more questions, or lays out a full design or plan before asking anything."

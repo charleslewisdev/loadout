@@ -16,6 +16,7 @@ cat >"$t/bin/claude" <<'STUB'
 # Plants the kept directory `claude plugin eval --keep-temp` leaves, then reports it.
 [[ " $* " == *' --keep-temp '* ]] || { echo 'score 1.0'; exit 0; }
 echo "${TMPDIR:-}" >"$STUB_TMP/tmpdir-seen"
+command -v gh >"$STUB_TMP/gh-seen"
 dir=$STUB_TMP/claude-eval-$RANDOM
 mkdir -p "$dir/config" "$dir/sealed"
 [[ ${STUB_BROKEN:-} ]] && echo "$STUB_BROKEN" >"$dir/config/trace.jsonl"
@@ -33,6 +34,7 @@ left() { ls -d "$t"/claude-eval-* >/dev/null 2>&1; }
 
 run STUB_X=1 "$here/eval" plugins/x
 check 'a clean run keeps its exit code' test "$rc" = 0
+check 'the eval gets the stub gh, ahead of any real one' test "$(cat "$t/gh-seen")" = "$here/eval-bin/gh"
 check 'it cleans up the trace it kept' bash -c "! ls -d '$t'/claude-eval-* 2>/dev/null | grep -q ."
 
 run STUB_BROKEN='apply-seccomp: Permission denied' "$here/eval" plugins/x

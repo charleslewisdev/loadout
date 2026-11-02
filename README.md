@@ -87,7 +87,7 @@ To place something new, ask three questions:
 
 | Skill | Invoked by | What it does |
 | --- | --- | --- |
-| `map-scout` | Claude | Turns an open idea into a decision |
+| `map-scout` | Claude | Turns an open idea into a decision, and flags your other repos when one relates |
 | `map-draw` | Claude | Turns a decision into a plan, with a test per task |
 | `map-follow` | Claude | Runs the plan task by task in fresh subagents |
 | `bug-hunt` | Claude | Reproduces a bug with a failing test before it changes code |
@@ -110,6 +110,8 @@ The five hooks check your configuration at session start, send desktop notificat
 3. Run `bug-hunt` when something breaks along the way.
 4. Run `review-party` before you call it done.
 5. Run `pr-turn-in` to commit and open the PR.
+
+`map-scout` runs a `gh` query on every use, without a prompt. It sends the names and descriptions of up to 100 repos you own or reach through an organization, private ones included, plus the latest commit subjects of the newest 8, to your Claude session. To turn the check off and keep the skill, create the file `~/.config/loadout/no-portfolio`.
 
 Outside the ticket, `gear-stats` reads the sheet, `gear-mend` handles anything that annoys you, `gear-respec` is the periodic save point, and `gear-outfit` keeps your settings and permissions current.
 

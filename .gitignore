@@ -3,3 +3,6 @@
 
 # Private to this checkout
 CLAUDE.local.md
+
+# Plans and design records are working files for Claude, not documentation
+docs/plans/

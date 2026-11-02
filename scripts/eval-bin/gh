@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Stands in for gh in eval cases, which have no network. Answers from the file a
+# fixture planted, or fails as the real gh does in the sandbox. Honors --jq only.
+[[ -r $HOME/gh-answer.json ]] || { echo "gh: no network in the eval sandbox" >&2; exit 1; }
+while (($#)); do
+  [[ $1 == --jq ]] && filter=$2
+  shift
+done
+jq -r "${filter:-.}" "$HOME/gh-answer.json"

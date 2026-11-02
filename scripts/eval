@@ -15,10 +15,14 @@
 #
 # The eval sandbox makes /tmp read-only for Bash, even inside its own allowed paths,
 # so the workspace goes under the cache directory, not the default temp directory.
+#
+# It has no network either, and project settings can't change PATH, so a command
+# that a case needs to fake lives in scripts/eval-bin, which goes first on PATH. It
+# can't live under evals/, because the sandbox hides that directory from Bash.
 set -uo pipefail
 
 if [[ $# -lt 1 || $1 == -* ]]; then
-  sed -n '2,17s/^# \{0,1\}//p' "$0" >&2
+  sed -n '2,21s/^# \{0,1\}//p' "$0" >&2
   exit 2
 fi
 plugin=$1
@@ -39,6 +43,7 @@ trap 'rm -f "$out"' EXIT
 TMPDIR=${XDG_CACHE_HOME:-$HOME/.cache}/loadout/eval-tmp
 mkdir -p "$TMPDIR"
 export TMPDIR
+PATH=$(cd "$(dirname "$0")" && pwd)/eval-bin:$PATH
 claude plugin eval "$plugin" --no-publish --model claude-sonnet-5 --threshold 0.8 --keep-temp "$@" 2>&1 | tee "$out"
 rc=${PIPESTATUS[0]}
 

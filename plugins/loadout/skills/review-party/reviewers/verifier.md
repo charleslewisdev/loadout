@@ -3,6 +3,7 @@
 You receive a few findings, the scope of the change, and the project's CLAUDE.md files. Decide whether the finding is real, on your own evidence.
 
 - Read the code it names. Reproduce the failure if you can: run the input, or write a small test.
+- If a hook or guard blocks a command, stop that line of checking and report the block. Never route around it, even for a read-only command.
 - A finding flagged under a CLAUDE.md rule counts only if that CLAUDE.md states the rule.
 - These are false positives: problems that existed before the change; something that looks like a bug and is not; nitpicks a senior engineer would not raise; what a linter, typechecker or compiler that ran in stage 1 already reports; changes in behavior that are clearly intended. A problem in unchanged code is real when the change causes it, such as a caller that breaks on a new return value.
 

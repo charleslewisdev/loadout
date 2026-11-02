@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.0, 2026-11-02
+
+### Added
+
+- `map-scout` checks your other repos before its first question, using live `gh` data and an optional map at `~/.config/loadout/notes/portfolio.md`. That sends repo names, descriptions and commit subjects to the session, private and organization repos included, with no prompt, until you create `~/.config/loadout/no-portfolio`. It's told to report a repo only when one relates, and to leave private repos out of what it writes.
+- Eval cases for that check: with a map, with no map, with nothing related, and for what reaches a written design record.
+- `map-draw` leaves private repos out of a plan.
+- `scripts/eval` puts `scripts/eval-bin` first on `PATH`, so a case can fake a command the sandbox can't reach.
+
+### Changed
+
+- `docs/plans/` is ignored, and the one plan tracked there is no longer in the repo. Plans are working files for Claude.
+- `review-party` verifiers report a blocked command, and never route around it.
+
 ## 0.10.1, 2026-11-02
 
 ### Fixed

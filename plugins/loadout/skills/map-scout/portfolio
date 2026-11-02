@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Prints the owner's repositories for map-scout: the curated map if there is one,
+# then the live list from gh. Always exits 0, because planning goes on without it.
+#
+#   portfolio
+#
+# Creating ~/.config/loadout/no-portfolio turns this off, so nothing is read or sent.
+# The map is optional and lives at ~/.config/loadout/notes/portfolio.md. Every repo
+# gets one line, since an old repo can still hold the answer. Commit subjects are
+# kept to the newest few: 35 repos print about 1,200 tokens. --jq runs inside gh,
+# so this needs no jq of its own.
+set -uo pipefail
+
+repos=100 # one page, GitHub's limit, and more than a planning glance needs
+recent=8  # repos that also list their latest commits
+
+# Runs left the "no hits" line in the reply when only SKILL.md forbade it, so the rule
+# also lands here, the last thing read before replying.
+trap 'printf "\n%s\n" "End of lookup. If no repo relates to this idea, stay silent about it: a line such as \"no related repos\" or \"starting fresh\" counts as mentioning it. Your reply then opens with the design question itself."' EXIT
+
+if [[ -e $HOME/.config/loadout/no-portfolio ]]; then
+  echo "## Portfolio: off"
+  exit 0
+fi
+
+map=$HOME/.config/loadout/notes/portfolio.md
+if [[ -r $map ]]; then
+  echo "## Curated map"
+  cat "$map"
+else
+  echo "## Curated map: none"
+fi
+
+echo
+query='query($n: Int!) { viewer { repositories(first: $n, ownerAffiliations: [OWNER, ORGANIZATION_MEMBER], orderBy: {field: PUSHED_AT, direction: DESC}) {
+  totalCount
+  nodes { nameWithOwner isPrivate isFork isArchived pushedAt description primaryLanguage { name }
+    defaultBranchRef { target { ... on Commit { history(first: 2) { nodes { messageHeadline } } } } } } } } }'
+# One line per field, so a description can't forge a line of its own.
+filter='def clean($n): (. // "") | gsub("[[:cntrl:]]"; " ") | .[:$n];
+.data.viewer.repositories
+| "total \(.totalCount)",
+  (.nodes | to_entries[] | .key as $i | .value
+   | ([.nameWithOwner,
+       (if .isPrivate then "private" else "public" end),
+       (if .isFork then "fork" else empty end),
+       (if .isArchived then "archived" else empty end),
+       (.pushedAt // "" | .[:10]),
+       (.primaryLanguage.name // empty),
+       (.description | clean(100))] | join(" | ")),
+     (if $i < '$recent' then
+        (.defaultBranchRef.target.history.nodes // [])[]
+        | "  recent: " + (.messageHeadline | clean(70))
+      else empty end))'
+
+if ! command -v gh >/dev/null; then
+  echo "## Live repos: unavailable, gh isn't installed"
+  exit 0
+fi
+# On an API error, gh skips --jq and prints the raw body to stdout, so only the
+# filter's own first line proves the rest is the list. A partial answer is an error
+# too: its body would go to the model unfiltered and uncapped.
+out=$(gh api graphql -f query="$query" -F n="$repos" --jq "$filter" 2>/dev/null)
+total=${out%%$'\n'*}
+if [[ ! $total =~ ^total\ [0-9]+$ ]]; then
+  echo "## Live repos: unavailable, gh failed (try gh auth status)"
+  exit 0
+fi
+echo "## Live repos, newest push first (${total#total } total, up to $repos shown)"
+tail -n +2 <<<"$out"
+exit 0

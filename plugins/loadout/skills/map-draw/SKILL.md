@@ -13,6 +13,8 @@ If the design is not settled, stop and use `/loadout:map-scout` first.
 
 `docs/plans/<yyyy-mm-dd>-<feature>.md`, or the path the person names.
 
+A plan can land in a public repo, so it mentions public repos only. Leave out private repos entirely, even when the design or the conversation names one.
+
 ## Header
 
 ```markdown

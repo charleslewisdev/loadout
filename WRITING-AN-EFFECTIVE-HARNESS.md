@@ -102,6 +102,8 @@ A public kit can stay generic if a private companion repo holds your specifics. 
 
 The `unraid` skill in the `homelab` plugin shows the third: pool names and addresses are placeholders until a notes file fills them in. Reading a file outside the project needs permission, so the profiles allow `Read(~/.config/loadout/notes/**)`. Without that rule, a `dontAsk` session denies the read, and the skill falls back to placeholders. Copy notes into place instead of linking them, because a rule on the notes path doesn't cover a link's target. Read notes with plain file reading: I tried `!` shell injection for this first, and the skill errored when it loaded them.
 
+`map-scout` shows the same split for a portfolio. Its `portfolio` script asks `gh` for your repos, private and organization ones included, and their latest commits, and adds `~/.config/loadout/notes/portfolio.md` if you keep one, to say what each repo is for and how they relate. The skill's listing doesn't change, so the check costs nothing until `map-scout` runs. Then it prints about 1,200 tokens for 35 repos. All of that reaches the session, with no prompt, so create `~/.config/loadout/no-portfolio` on any account whose repo list you don't want sent to your model provider. The skill is told to report a repo only when one relates, and to leave private repos out of the design record.
+
 A fork needs none of this: with no `--machine` file and no notes, every public skill still works.
 
 ## 3. Give every surface a budget

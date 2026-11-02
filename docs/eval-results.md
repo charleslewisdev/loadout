@@ -2,10 +2,11 @@
 
 The newest score for every eval case, written by `scripts/eval-summary`. A score of 0.80 is the pass mark, and the [audit log](audit-log.md) records how these move over time.
 
-Two cases sit below the pass mark, each with a recorded reason:
+Three cases sit below the pass mark, each with a recorded reason:
 
 - **`verify-before-done`:** it scored from 0.17 to 0.50 once the sandbox worked. The model often runs a test command of its own in place of `check.sh`, or reports a pass without quoting the output. Two rewordings of the peer style's rule made no reliable difference, so the rule stays as it was.
 - **`rephrase-a-put-idempotent`:** the case is noisy, scoring 0.00 and 0.67 on the same style. A new sentence about wrong claims reached only 0.17 to 0.33, and it dropped `rephrase-c-put-idempotent` to 0.83, so I left it out.
+- **`map-scout-portfolio-quiet`:** ten runs score 0.77 on Sonnet 5, the pinned model, because 6 of 10 replies add a line such as "no related repos". None named a repo as a hit. On Opus 5.5, `stayed-quiet` passed 10 of 10, and the case scored 0.83. Three rewordings moved Sonnet 5 from 1 clean reply in 6 to about 4 in 10, and no further.
 
 | Case | Plugin | Uses Bash | Score | Date | CLI |
 | --- | --- | --- | --- | --- | --- |
@@ -40,8 +41,12 @@ Two cases sit below the pass mark, each with a recorded reason:
 | lore-scribe-voice-default | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |
 | lore-scribe-voice-rpg | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |
 | lore-scribe-voice-unknown | loadout | no | 0.89 | 2026-11-01 | 2.1.316 |
-| map-draw-smoke | loadout | no | 1.00 | 2026-11-01 | 2.1.316 |
+| map-draw-smoke | loadout | no | 1.00 | 2026-11-02 | 2.1.316 |
 | map-follow-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
+| map-scout-portfolio-live | loadout | yes | 0.89 | 2026-11-02 | 2.1.316 |
+| map-scout-portfolio-map | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
+| map-scout-portfolio-quiet | loadout | yes | 0.77 | 2026-11-02 | 2.1.316 |
+| map-scout-portfolio-record | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
 | map-scout-smoke | loadout | no | 1.00 | 2026-11-02 | 2.1.316 |
 | pr-turn-in-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
 | readme-s6 | loadout | no | 1.00 | 2026-10-31 | 2.1.316 |
