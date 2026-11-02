@@ -206,3 +206,26 @@ The rest includes the language servers. With all three on, each measures 0 when 
 **Shared kit:** 18 of 22 items, or 82%, are on every machine of mine: 11 skills, 5 hooks, the statusline and the output style. `unraid` and the three language servers are chosen per machine. The two new servers are enabled in a private machine profile, and `install.sh` installs only this repo's plugins, so a new machine also needs `claude plugin install` for each.
 
 **Hook p95, skill usage and eval results:** no hook or kit skill changed, so there's no new table.
+
+## 2026-11-02: evals running again
+
+**CLI:** 2.1.316, on Sonnet 5, three runs per case unless a case sets its own.
+
+**Why:** every Bash case had been untrustworthy since October, so a low score could mean a bad skill or a broken sandbox.
+
+**Causes:** two faults stacked. An AppArmor update took capabilities away from everything `bwrap` starts, which broke the sandbox outright. Once that was lifted, the sandbox still made `/tmp` read-only for Bash, and the eval workspace lives in `/tmp`, so `git add`, `git commit` and shell redirects failed while the Write and Edit tools kept working.
+
+**Fixes:** `scripts/eval` now puts the workspace under the cache directory, and exits 3 on the read-only errors, which it used to miss. `pr-turn-in` now names PR descriptions in its trigger, so it fires on that request. `map-scout-smoke` no longer lets a judge count a reworded question as a second one.
+
+| Case | Before | After | Baseline after |
+| --- | --- | --- | --- |
+| `map-follow-smoke` | 0.22 | 1.00 | 0.67 |
+| `gear-respec-smoke` | 0.20 | 1.00 | 0.00 |
+| `gear-outfit-smoke` | 0.67 | 1.00 | 0.00 |
+| `gear-mend-smoke` | 0.50 | 0.92 | 0.42 |
+| `pr-turn-in-smoke` | 0.72 | 1.00 | 0.61 |
+| `map-scout-smoke` | 0.50 | 1.00 | 0.00 |
+
+The "before" column is a same-day run with the workspace in `/tmp`, except `map-scout-smoke`, which is its recorded score from 2026-11-01. In its "after" run, one of three replies never fired the skill and only offered to, which the `with-only` grader reports but doesn't score.
+
+**Eval results:** of 38 cases, 36 pass and 2 score below 0.80, each with a reason in [eval-results.md](eval-results.md). No case is left untrusted or unrun.

@@ -1,6 +1,6 @@
 ---
 name: pr-turn-in
-description: "Branch, commit and PR conventions; PR descriptions checked claim by claim against git diff, with the feedback wanted. Use when committing, opening a PR or finishing a branch."
+description: "Branch, commit and PR conventions; PR descriptions checked claim by claim against git diff, with the feedback wanted. Use when writing a PR description, committing, opening a PR or finishing a branch."
 ---
 
 # Branches, commits and pull requests

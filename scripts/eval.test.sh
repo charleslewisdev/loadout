@@ -15,6 +15,7 @@ cat >"$t/bin/claude" <<'STUB'
 #!/usr/bin/env bash
 # Plants the kept directory `claude plugin eval --keep-temp` leaves, then reports it.
 [[ " $* " == *' --keep-temp '* ]] || { echo 'score 1.0'; exit 0; }
+echo "${TMPDIR:-}" >"$STUB_TMP/tmpdir-seen"
 dir=$STUB_TMP/claude-eval-$RANDOM
 mkdir -p "$dir/config" "$dir/sealed"
 [[ ${STUB_BROKEN:-} ]] && echo "$STUB_BROKEN" >"$dir/config/trace.jsonl"
@@ -40,6 +41,19 @@ check 'it says why' grep -q 'scores are invalid' <<<"$out"
 
 run STUB_BROKEN='bwrap: setting up uid map: Permission denied' "$here/eval" plugins/x
 check 'a bwrap failure counts as a broken sandbox' test "$rc" = 3
+
+run STUB_BROKEN='/bin/bash: line 1: /tmp/claude-eval-x/tmp/claude-1000/cwd-0339: Read-only file system' "$here/eval" plugins/x
+check 'an unwritable workspace counts as a broken sandbox' test "$rc" = 3
+
+run STUB_BROKEN="fatal: Unable to create '/tmp/claude-eval-x/home/cwd/.git/index.lock': Read-only file system" "$here/eval" plugins/x
+check 'an unwritable .git counts as a broken sandbox' test "$rc" = 3
+
+run STUB_BROKEN='OSError: [Errno 30] Read-only file system' "$here/eval" plugins/x
+check 'a read-only error from a case itself is not a broken sandbox' test "$rc" = 0
+
+run HOME="$t/home" XDG_CACHE_HOME= TMPDIR=/tmp "$here/eval" plugins/x
+check 'the workspace stays out of /tmp, which the eval sandbox makes read-only' test "$(cat "$t/tmpdir-seen")" = "$t/home/.cache/loadout/eval-tmp"
+check 'that directory exists' test -d "$t/home/.cache/loadout/eval-tmp"
 
 run STUB_REWORDED=1 "$here/eval" plugins/x
 check 'a run it cannot check exits 3, not the score' test "$rc" = 3

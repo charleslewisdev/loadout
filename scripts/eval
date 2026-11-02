@@ -12,10 +12,13 @@
 # couldn't check: graders see that a command was attempted, so a broken sandbox can
 # score 1.0. Only the kept traces show it reliably, so every run keeps them and this
 # removes them afterward, unless you passed --keep-temp yourself.
+#
+# The eval sandbox makes /tmp read-only for Bash, even inside its own allowed paths,
+# so the workspace goes under the cache directory, not the default temp directory.
 set -uo pipefail
 
 if [[ $# -lt 1 || $1 == -* ]]; then
-  sed -n '2,14s/^# \{0,1\}//p' "$0" >&2
+  sed -n '2,17s/^# \{0,1\}//p' "$0" >&2
   exit 2
 fi
 plugin=$1
@@ -33,6 +36,9 @@ done
 
 out=$(mktemp)
 trap 'rm -f "$out"' EXIT
+TMPDIR=${XDG_CACHE_HOME:-$HOME/.cache}/loadout/eval-tmp
+mkdir -p "$TMPDIR"
+export TMPDIR
 claude plugin eval "$plugin" --no-publish --model claude-sonnet-5 --threshold 0.8 --keep-temp "$@" 2>&1 | tee "$out"
 rc=${PIPESTATUS[0]}
 
@@ -41,7 +47,7 @@ while IFS= read -r dir; do
   [[ -d $dir ]] || continue
   checked=$((checked + 1))
   # sealed/ is mode 000 and holds what the plugin wrote; the traces are in the rest.
-  grep -rqs -E -e 'apply-seccomp|bwrap: ' --exclude-dir=sealed "$dir" && broken=1
+  grep -rqs -E -e 'apply-seccomp|bwrap: |/cwd-[0-9a-f]+: Read-only file system|index\.lock.{0,3}: Read-only file system' --exclude-dir=sealed "$dir" && broken=1
   if ((!keep)) && [[ $(basename "$dir") == claude-eval-* && $dir != *..* && ! -L $dir ]]; then
     chmod -R u+rwx "$dir" 2>/dev/null
     rm -rf "$dir"

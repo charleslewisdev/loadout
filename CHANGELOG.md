@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.1, 2026-11-02
+
+### Fixed
+
+- `scripts/eval` runs the eval workspace outside `/tmp`, where the sandbox blocks Bash from writing, and exits 3 on those errors.
+- `pr-turn-in` fires on a request to write a PR description.
+- `map-scout-smoke` no longer fails a reply for repeating its one question.
+
+### Changed
+
+- `docs/eval-results.md` has a real score for every case, and records why two stay below the pass mark.
+
 ## 0.10.0, 2026-11-01
 
 ### Changed

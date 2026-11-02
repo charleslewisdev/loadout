@@ -16,4 +16,4 @@ graders:
     arm: with-only
   - name: one-question
     type: llm
-    criteria: "Pass only if the reply asks the user exactly one question and stops there, without presenting a finished design. A short restatement of the goal or a note on what comes next is fine; offering labeled options for that one question is fine. Fail if the reply asks two or more questions, or lays out a full design or plan before asking anything."
+    criteria: "Pass only if the reply asks the user exactly one question and stops there, without presenting a finished design. A short restatement of the goal or a note on what comes next is fine; offering labeled options for that one question is fine. Asking that same question again in other words at the end, or adding \"or something else?\", still counts as one question. Fail if the reply asks two or more questions, or lays out a full design or plan before asking anything."
