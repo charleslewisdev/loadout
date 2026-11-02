@@ -1,17 +1,19 @@
 # url<TAB>quote. Each Anthropic quote pasted in WRITING-AN-EFFECTIVE-HARNESS.md; scripts/quote-check reads this file.
 https://code.claude.com/docs/en/memory	delivered as a user message after the system prompt
 https://code.claude.com/docs/en/memory	target under 200 lines per CLAUDE.md file
-https://code.claude.com/docs/en/memory	Imported files are expanded and loaded into context at launch
-https://code.claude.com/docs/en/best-practices	Bloated CLAUDE.md files cause Claude to ignore your actual instructions!
-https://code.claude.com/docs/en/best-practices	Would removing this cause Claude to make mistakes?
-https://code.claude.com/docs/en/best-practices	If Claude already does something correctly without the instruction, delete it or convert it to a hook.
+https://code.claude.com/docs/en/memory	Imported files are expanded and loaded into context alongside the CLAUDE.md that references them
+https://code.claude.com/docs/en/best-practices	the file has grown long enough that the line gets lost
+https://code.claude.com/docs/en/best-practices	Could it find this by reading the code?
+https://code.claude.com/docs/en/best-practices	Would it actually go and look?
+https://code.claude.com/docs/en/best-practices	If both are yes, leave it out.
+https://code.claude.com/docs/en/best-practices	If you keep adding emphasis to a `CLAUDE.md` line and Claude still misses it, that's a sign the line belongs in a hook. The reverse holds too: if you have hooks for things that are only preferences, delete them and let Claude decide.
 https://code.claude.com/docs/en/skills	Keep SKILL.md under 500 lines
 https://code.claude.com/docs/en/plugin-evals	If a case scores 1.0 both with and without the plugin, the plugin isn't what made it pass.
-https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices	Where you might have said "CRITICAL: You MUST use this tool when...", you can use more normal prompting like "Use this tool when..."
+https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices	Where you might have said "CRITICAL: You MUST use this tool when...," you can use more normal prompting such as "Use this tool when..." instead.
 https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	Create evaluations BEFORE writing extensive documentation
 https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	Only the script's output consumes tokens
 https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	don't consume context tokens until actually read
-https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	Claude might use commands like head -100 to preview content rather than reading entire files, resulting in incomplete information.
+https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	Claude might use commands such as head -100 to preview content rather than reading entire files, resulting in incomplete information.
 https://raw.githubusercontent.com/anthropics/claude-plugins-official/4ca561fb8532594e7a5faef945e85096fcec0616/plugins/code-review/commands/code-review.md	Do not check build signal or attempt to build or typecheck the app.
 https://raw.githubusercontent.com/anthropics/claude-plugins-official/4ca561fb8532594e7a5faef945e85096fcec0616/plugins/code-review/commands/code-review.md	Filter out any issues with a score less than 80.
 https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models	We removed over 80% of Claude Code's system prompt for models like Claude Opus 5 and Claude Fable 5 with no measurable loss on our coding evaluations.

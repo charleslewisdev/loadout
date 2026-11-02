@@ -229,3 +229,30 @@ The rest includes the language servers. With all three on, each measures 0 when 
 The "before" column is a same-day run with the workspace in `/tmp`, except `map-scout-smoke`, which is its recorded score from 2026-11-01. In its "after" run, one of three replies never fired the skill and only offered to, which the `with-only` grader reports but doesn't score.
 
 **Eval results:** of 38 cases, 36 pass and 2 score below 0.80, each with a reason in [eval-results.md](eval-results.md). No case is left untrusted or unrun.
+
+## 2026-11-02: first heal
+
+**CLI:** 2.1.316, on Haiku, three usable runs per configuration.
+
+**Why:** the first `/loadout:gear-heal` run in harness mode, with `/doctor prompt-audit` run just before it.
+
+**What changed:** six quotes in the guide went stale after Anthropic rewrote its pages, and all six now match. The best-practices page replaced its pruning test, so the guide now teaches the new one. `CLAUDE.md` now says `guard/gh-hook` scans each publishing gh command, since it can't check that the file-and-show flow ran, and `gear-respec` now names the audit log's latest entry format. Claude Code's changelog has nothing newer than 2.1.316.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Total at turn 0, with connectors and auto-memory | 22,107 | 22,115 |
+| Harness share, with connectors | 4,442 | 4,449 |
+| Harness share, without connectors | 2,750 | 2,756 |
+| Vendor floor | 16,972 | 16,972 |
+| Auto-memory section, outside the share | 693 | 694 |
+| Account-synced skills | 699 (11) | 699 (11) |
+| Account connectors | 1,693 | 1,693 |
+| `bard` plugin | 728 | 728 |
+| User CLAUDE.md | 643 | 643 |
+| `loadout` plugin | 469 | 476 |
+| `homelab` plugin | 73 | 73 |
+| Personal skills and the rest | 137 | 137 |
+
+The 7-token rise in `loadout` is the `pr-turn-in` description change from 0.10.1, which reverting it on a scratch copy of the plugin confirmed. Typed-only skills such as `gear-heal` measured 0.
+
+**Hook p95, skill usage and eval results:** no hook changed, and the one skill edit doesn't affect what triggers it, so there's no new table.
