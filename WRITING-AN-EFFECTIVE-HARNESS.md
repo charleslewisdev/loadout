@@ -133,7 +133,7 @@ A fork needs none of this: with no `--machine` file and no notes, every public s
 
 ## 3. Give every surface a budget
 
-Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, from November 2, and skill bodies and skill descriptions, from November 2.
+Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, skill bodies and skill descriptions, from November 2.
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
@@ -148,7 +148,7 @@ Every always-on surface gets a target and a ceiling. The "Now" column is from Oc
 
 The 200-line ceiling rests on token cost, not adherence. A factorial study found compliance of 60.0, 65.2, 67.7, and 64.0% at 25, 100, 250, and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still name length as one reason a line gets missed: "the file has grown long enough that the line gets lost" ([best practices](https://code.claude.com/docs/en/best-practices)).
 
-The best pruning test I know comes from that same page, as two questions: "Could it find this by reading the code?" and "Would it actually go and look?" Then: "If both are yes, leave it out." It works in both directions: "If you keep adding emphasis to a `CLAUDE.md` line and Claude still misses it, that's a sign the line belongs in a hook. The reverse holds too: if you have hooks for things that are only preferences, delete them and let Claude decide."
+The best pruning test I know comes from that same page, as two questions: "Could it find this by reading the code?" and "Would it actually go and look?" Then: "If both are yes, leave it out." On where a line belongs, the page draws the boundary both ways: "If you keep adding emphasis to a `CLAUDE.md` line and Claude still misses it, that's a sign the line belongs in a hook. The reverse holds too: if you have hooks for things that are only preferences, delete them and let Claude decide."
 
 `scripts/lint-budgets` checks files offline, fails on a ceiling, and warns past a target, and CI runs it on every push. Keep budgets out of session start. A budget is a maintenance signal, and it should never stop you from working. You also don't need wrappers around `/doctor`, `/context`, `/skill-doctor`, or `claude plugin prune`, because they already exist.
 
@@ -394,7 +394,7 @@ Token counts, timings, and eval scores come from `claude -p` token accounting, a
 | [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices), Anthropic | The prune test; moving missed lines to hooks and deleting hooks for preferences; what belongs in CLAUDE.md, and when a line moves to a hook, a path rule or a skill; `/init` and `/doctor` |
 | [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices), Anthropic | 500-line skill bodies, reference files that cost nothing until read, the nested-reference warning, evaluations first |
 | [Prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices), Anthropic | Normal prompting instead of "CRITICAL: You MUST" |
-| Claude Code docs: [memory](https://code.claude.com/docs/en/memory), [output styles](https://code.claude.com/docs/en/output-styles), [skills](https://code.claude.com/docs/en/skills), [hooks](https://code.claude.com/docs/en/hooks), [plugin evals](https://code.claude.com/docs/en/plugin-evals), [plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) | CLAUDE.md delivery and the 200-line target, imports loading at launch, what `/doctor prompt-audit` changes, style delivery, hook output, eval arms and report publishing |
+| Claude Code docs: [memory](https://code.claude.com/docs/en/memory), [output styles](https://code.claude.com/docs/en/output-styles), [skills](https://code.claude.com/docs/en/skills), [hooks](https://code.claude.com/docs/en/hooks), [plugin evals](https://code.claude.com/docs/en/plugin-evals), [plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) | CLAUDE.md delivery and the 200-line target, imports loading with their CLAUDE.md, what `/doctor prompt-audit` changes, style delivery, hook output, eval arms and report publishing |
 | [claude-plugins-official](https://github.com/anthropics/claude-plugins-official), Anthropic | The code-review plugin's cut-off of 80 and its no-build rule |
 | [arXiv 2608.11095](https://arxiv.org/abs/2608.11095), Chakrabarti, 2026 | Instructions leave mostly in wholesale rewrites, and files grow faster afterwards |
 | [arXiv 2605.10039](https://arxiv.org/abs/2605.10039), McMillan, 2026 | CLAUDE.md size did not significantly move compliance between 25 and 500 lines |

@@ -10,7 +10,7 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 
 ## Character sheet
 
-`/loadout:gear-stats` prints a longer version of this sheet. These stats are from November 1, 2026, on Claude Code 2.1.316:
+`/loadout:gear-stats` prints a longer version of this sheet. These stats are from November 2, 2026, on Claude Code 2.1.316:
 
 | Stat | Value | In plain words |
 | --- | --- | --- |
@@ -20,7 +20,7 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
 | **Save point** | Every 90 days at most | A retro that opens one pull request of additions and deletions |
 
-Until November 2026 `scripts/budget` could miss account connectors, and it reported 5,986. The true figure was 9,016, over the ceiling, and most of it came from my Claude account, not this repo. Trimming the account's skills and connectors per machine brought it down, and the [audit log](docs/audit-log.md) keeps score. The `loadout` plugin is 469 of the total, `bard` is 728, and `homelab` is 73.
+Until November 2026 `scripts/budget` could miss account connectors, and it reported 5,986. The true figure was 9,016, over the ceiling, and most of it came from my Claude account, not this repo. Trimming the account's skills and connectors per machine brought it down, and the [audit log](docs/audit-log.md) keeps score. The `loadout` plugin is 476 of the total, `bard` is 728, and `homelab` is 73.
 
 > [!NOTE]
 > **About the evidence.** Every number here comes from a command I ran, or carries a link. Rules I could test had to change Claude's behavior in a with-and-without eval to stay, [the guide](WRITING-AN-EFFECTIVE-HARNESS.md) lists the exceptions, and [the eval results](docs/eval-results.md) show the latest score for every case. Anything marked **opinion** is my taste, not how Claude Code behaves.

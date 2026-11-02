@@ -236,7 +236,7 @@ The "before" column is a same-day run with the workspace in `/tmp`, except `map-
 
 **Why:** the first `/loadout:gear-heal` run in harness mode, with `/doctor prompt-audit` run just before it.
 
-**What changed:** six quotes in the guide went stale after Anthropic rewrote its pages, and all six now match. The best-practices page replaced its pruning test, so the guide now teaches the new one. `CLAUDE.md` no longer says `guard/gh-hook` blocks what it can't see, and `gear-respec` now names the audit log's latest entry format. The changelog has nothing newer than 2.1.316.
+**What changed:** six quotes in the guide went stale after Anthropic rewrote its pages, and all six now match. The best-practices page replaced its pruning test, so the guide now teaches the new one. `CLAUDE.md` now says `guard/gh-hook` scans each publishing gh command, since it can't check that the file-and-show flow ran, and `gear-respec` now names the audit log's latest entry format. Claude Code's changelog has nothing newer than 2.1.316.
 
 | Metric | Before | After |
 | --- | --- | --- |
@@ -253,6 +253,6 @@ The "before" column is a same-day run with the workspace in `/tmp`, except `map-
 | `homelab` plugin | 73 | 73 |
 | Personal skills and the rest | 137 | 137 |
 
-The 7-token rise in `loadout` is the `gear-heal` listing from 0.12.0, measured here for the first time.
+The 7-token rise in `loadout` is the `pr-turn-in` description change from 0.10.1, which reverting it on a scratch copy of the plugin confirmed. Typed-only skills such as `gear-heal` measured 0.
 
 **Hook p95, skill usage and eval results:** no hook changed, and the one skill edit doesn't affect what triggers it, so there's no new table.
