@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.1, 2026-11-02
+
+### Fixed
+
+- The guide's six stale Anthropic quotes match their live pages again. The best-practices page changed its pruning test, so the guide's claim changed with it.
+- `gear-respec` copies the audit log's latest entry format, the same as `gear-heal`. The log runs oldest first, so "first entry" named the baseline.
+- `CLAUDE.md` says what `guard/gh-hook` does: it scans each publishing gh command, and doesn't check that the file-and-show flow ran.
+
 ## 0.12.0, 2026-11-02
 
 ### Added

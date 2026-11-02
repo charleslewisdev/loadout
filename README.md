@@ -14,7 +14,7 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 
 | Stat | Value | In plain words |
 | --- | --- | --- |
-| **Encumbrance** | 4,442 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
+| **Encumbrance** | 4,449 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
 | **Inventory** | 12 skills, plus 1 in `bard` and 1 in `homelab` | Procedures Claude picks up when they apply, or that you type |
 | **Reflexes** | 5 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |

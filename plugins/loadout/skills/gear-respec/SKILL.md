@@ -51,7 +51,7 @@ Write `retros/<yyyy-mm-dd>.md`:
 
 This file dates the retro for /loadout:gear-stats.
 
-Then add an entry to `docs/audit-log.md` under the heading `## <yyyy-mm-dd>`, in the format the file's first entry uses: the CLI version, why the audit ran, what changed, and the same metrics with before and after columns. The before column is the previous entry's after column. `scripts/check` fails if a retro has no entry. `scripts/budget` prints connector names, which can be private and which the guard can't catch. Keep connector and account-synced skill names out of the entry, the retro file and the pull request, and give those surfaces as totals or as "connector 1", "connector 2".
+Then add an entry to `docs/audit-log.md` under the heading `## <yyyy-mm-dd>`, in the format the file's latest entry uses: the CLI version, why the audit ran, what changed, and the same metrics with before and after columns. The before column is the previous entry's after column. `scripts/check` fails if a retro has no entry. `scripts/budget` prints connector names, which can be private and which the guard can't catch. Keep connector and account-synced skill names out of the entry, the retro file and the pull request, and give those surfaces as totals or as "connector 1", "connector 2".
 
 ## 5. Open the pull request
 

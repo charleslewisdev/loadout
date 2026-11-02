@@ -133,11 +133,11 @@ A fork needs none of this: with no `--machine` file and no notes, every public s
 
 ## 3. Give every surface a budget
 
-Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, from November 1, and skill bodies and skill descriptions, from November 2.
+Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, from November 2, and skill bodies and skill descriptions, from November 2.
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
-| Harness share | About 3,000 tokens | 6,000 tokens | 4,442 | About 3% of a 200k window above the vendor floor |
+| Harness share | About 3,000 tokens | 6,000 tokens | 4,449 | About 3% of a 200k window above the vendor floor |
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 532 tokens | Anthropic's built-in styles run 250 to 370 tokens, more with examples |
 | User CLAUDE.md | About 30 lines | 200 lines | 30 lines | The docs: "target under 200 lines per CLAUDE.md file" |
 | Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, gotchas |
@@ -146,9 +146,9 @@ Every always-on surface gets a target and a ceiling. The "Now" column is from Oc
 | All harness descriptions | | 5,000 characters | 2,310 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
 | Session-start output | Nothing on a configured machine | 300 characters | 0 | Re-sent after every compaction; checked by hand, not linted |
 
-The 200-line ceiling rests on token cost, not adherence. A factorial study found compliance of 60.0, 65.2, 67.7, and 64.0% at 25, 100, 250, and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still warn that "Bloated CLAUDE.md files cause Claude to ignore your actual instructions!" ([best practices](https://code.claude.com/docs/en/best-practices)).
+The 200-line ceiling rests on token cost, not adherence. A factorial study found compliance of 60.0, 65.2, 67.7, and 64.0% at 25, 100, 250, and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still name length as one reason a line gets missed: "the file has grown long enough that the line gets lost" ([best practices](https://code.claude.com/docs/en/best-practices)).
 
-The best pruning test I know comes from that same page: "For each line, ask: *"Would removing this cause Claude to make mistakes?"* If not, cut it." It goes further: "If Claude already does something correctly without the instruction, delete it or convert it to a hook."
+The best pruning test I know comes from that same page, as two questions: "Could it find this by reading the code?" and "Would it actually go and look?" Then: "If both are yes, leave it out." It works in both directions: "If you keep adding emphasis to a `CLAUDE.md` line and Claude still misses it, that's a sign the line belongs in a hook. The reverse holds too: if you have hooks for things that are only preferences, delete them and let Claude decide."
 
 `scripts/lint-budgets` checks files offline, fails on a ceiling, and warns past a target, and CI runs it on every push. Keep budgets out of session start. A budget is a maintenance signal, and it should never stop you from working. You also don't need wrappers around `/doctor`, `/context`, `/skill-doctor`, or `claude plugin prune`, because they already exist.
 
@@ -189,7 +189,7 @@ Decide with evidence: count each skill and connector's tool calls in your transc
 
 Treat every outside skill as unidentified loot: it arrives with `disable-model-invocation: true` and earns its way into the listing. A practitioner's three skill audits reached the same rule: "Disable unused skills the moment they're added." ([dev.to](https://dev.to/shimo4228/15-days-of-skill-sprawl-in-claude-code-lessons-from-3-audits-27em)). A skill written here gets invoked once by name after it lands, so its usage score starts above zero.
 
-Beware of skills that shout. superpowers cost about 2,540 tokens per session and injected: "If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill." Anthropic's guidance goes the other way: "Where you might have said "CRITICAL: You MUST use this tool when...", you can use more normal prompting like "Use this tool when..."." ([prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)).
+Beware of skills that shout. superpowers cost about 2,540 tokens per session and injected: "If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill." Anthropic's guidance goes the other way: "Where you might have said "CRITICAL: You MUST use this tool when...," you can use more normal prompting such as "Use this tool when..." instead." ([prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)).
 
 Check a new skill's name against the bundled skills before you write it, because the model will pick the bundled one. And if something must always happen, a description can't promise it. Self-review here is a hook: `review-gate` blocks a stop once per batch of work when two or more files changed since the last review.
 
@@ -278,8 +278,8 @@ The rungs rest on two lines from Anthropic's [skill authoring guide](https://pla
 
 Three splits look clever and aren't:
 
-- **`@` imports in CLAUDE.md.** "Imported files are expanded and loaded into context at launch", so the split files load anyway.
-- **A reference file that links to another.** On nested references, Anthropic warns: "Claude might use commands like `head -100` to preview content rather than reading entire files, resulting in incomplete information."
+- **`@` imports in CLAUDE.md.** "Imported files are expanded and loaded into context alongside the CLAUDE.md that references them", so the split files load anyway.
+- **A reference file that links to another.** On nested references, Anthropic warns: "Claude might use commands such as `head -100` to preview content rather than reading entire files, resulting in incomplete information."
 - **A table in a skill body.** It stays in context after use and rides through compaction.
 
 ## 9. Schedule the deletion
@@ -391,7 +391,7 @@ Token counts, timings, and eval scores come from `claude -p` token accounting, a
 | Source | What it supports here |
 | --- | --- |
 | [The new rules of context engineering for Claude 5 generation models](https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models), Anthropic, July 24, 2026 | The vendor removed over 80% of its system prompt |
-| [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices), Anthropic | The prune test; deleting instructions Claude already follows; what belongs in CLAUDE.md, and when a line moves to a hook, a path rule or a skill; `/init` and `/doctor` |
+| [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices), Anthropic | The prune test; moving missed lines to hooks and deleting hooks for preferences; what belongs in CLAUDE.md, and when a line moves to a hook, a path rule or a skill; `/init` and `/doctor` |
 | [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices), Anthropic | 500-line skill bodies, reference files that cost nothing until read, the nested-reference warning, evaluations first |
 | [Prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices), Anthropic | Normal prompting instead of "CRITICAL: You MUST" |
 | Claude Code docs: [memory](https://code.claude.com/docs/en/memory), [output styles](https://code.claude.com/docs/en/output-styles), [skills](https://code.claude.com/docs/en/skills), [hooks](https://code.claude.com/docs/en/hooks), [plugin evals](https://code.claude.com/docs/en/plugin-evals), [plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) | CLAUDE.md delivery and the 200-line target, imports loading at launch, what `/doctor prompt-audit` changes, style delivery, hook output, eval arms and report publishing |
