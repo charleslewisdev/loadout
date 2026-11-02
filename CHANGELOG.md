@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.0, 2026-11-02
+
+### Added
+
+- `gear-heal`, a typed-only audit. In a `loadout` checkout it compares the harness with Anthropic's docs. In any other repo it gives each line of the instruction files a verdict. Both modes propose every change in one pull request on `heal/<yyyy-mm-dd>`. Its evidence and its publishing need the denylist: without one, it says so and stops at a local commit.
+- `scripts/quote-check` compares each Anthropic quote in `docs/quotes.tsv` with its live page. It reaches the network, so it stays out of `scripts/check` and CI. Its offline test runs in `scripts/check`.
+- `scripts/retro-evidence --project <dir>` limits the evidence to one project, with a default window of 90 days.
+- Eval cases for both `gear-heal` modes, and for stopping when the scan can't run.
+- The guide teaches CLAUDE.md writing, in a new subsection of section 2.
+
+### Changed
+
+- `templates/CLAUDE.md` follows the docs' Commands, Conventions and Gotchas headings, and asks for a one-file test command.
+
 ## 0.11.0, 2026-11-02
 
 ### Added

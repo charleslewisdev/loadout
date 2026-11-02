@@ -1,0 +1,33 @@
+# url<TAB>quote. Each Anthropic quote pasted in WRITING-AN-EFFECTIVE-HARNESS.md; scripts/quote-check reads this file.
+https://code.claude.com/docs/en/memory	delivered as a user message after the system prompt
+https://code.claude.com/docs/en/memory	target under 200 lines per CLAUDE.md file
+https://code.claude.com/docs/en/memory	Imported files are expanded and loaded into context at launch
+https://code.claude.com/docs/en/best-practices	Bloated CLAUDE.md files cause Claude to ignore your actual instructions!
+https://code.claude.com/docs/en/best-practices	Would removing this cause Claude to make mistakes?
+https://code.claude.com/docs/en/best-practices	If Claude already does something correctly without the instruction, delete it or convert it to a hook.
+https://code.claude.com/docs/en/skills	Keep SKILL.md under 500 lines
+https://code.claude.com/docs/en/plugin-evals	If a case scores 1.0 both with and without the plugin, the plugin isn't what made it pass.
+https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices	Where you might have said "CRITICAL: You MUST use this tool when...", you can use more normal prompting like "Use this tool when..."
+https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	Create evaluations BEFORE writing extensive documentation
+https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	Only the script's output consumes tokens
+https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	don't consume context tokens until actually read
+https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices	Claude might use commands like head -100 to preview content rather than reading entire files, resulting in incomplete information.
+https://raw.githubusercontent.com/anthropics/claude-plugins-official/4ca561fb8532594e7a5faef945e85096fcec0616/plugins/code-review/commands/code-review.md	Do not check build signal or attempt to build or typecheck the app.
+https://raw.githubusercontent.com/anthropics/claude-plugins-official/4ca561fb8532594e7a5faef945e85096fcec0616/plugins/code-review/commands/code-review.md	Filter out any issues with a score less than 80.
+https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models	We removed over 80% of Claude Code's system prompt for models like Claude Opus 5 and Claude Fable 5 with no measurable loss on our coding evaluations.
+https://code.claude.com/docs/en/best-practices	takes a little of Claude's attention on *every* task, whether it's relevant or not
+https://code.claude.com/docs/en/best-practices	what Claude couldn't work out from the code itself
+https://code.claude.com/docs/en/best-practices	the exact test, typecheck, and lint commands, and how to run a single test file
+https://code.claude.com/docs/en/best-practices	an old pattern that's everywhere but that new code must not copy, or a directory that looks unused but isn't
+https://code.claude.com/docs/en/best-practices	which error helper the team settled on, how deploys work, what needs a migration review
+https://code.claude.com/docs/en/best-practices	Anything you've had to correct twice already
+https://code.claude.com/docs/en/best-practices	Claude reads the repo itself. Only write down what isn't in there.
+https://code.claude.com/docs/en/best-practices	generates a starting version from your codebase
+https://code.claude.com/docs/en/best-practices	From there the work is mostly removing lines.
+https://code.claude.com/docs/en/best-practices	suggests cuts for anything Claude can already work out from the code
+https://code.claude.com/docs/en/best-practices	flags instructions that were written for older models, point at files that no longer exist, or contradict each other
+https://code.claude.com/docs/en/best-practices	`CLAUDE.md` is for guidelines, and Claude is allowed to decide a guideline doesn't apply.
+https://code.claude.com/docs/en/best-practices	piling on emphasis mostly makes Claude over-apply the rule
+https://code.claude.com/docs/en/best-practices	so it only loads when Claude is actually working there
+https://code.claude.com/docs/en/best-practices	A long release procedure sitting in a skill doesn't weigh on your unrelated bug fix the way it would in `CLAUDE.md`.
+https://code.claude.com/docs/en/memory	nothing in your files changes until you ask Claude to apply them

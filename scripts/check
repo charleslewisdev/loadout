@@ -11,7 +11,7 @@
 #      it exists (never in CI)
 #   4. plugin, marketplace and skill names against guard/forbidden-names
 #   5. the statusline, notify, session-start, review gate, gh publication hook and guard/scan tests, and guard/scan --path and retro-evidence on synthetic homes
-#   6. install.sh, gear-outfit's script and map-scout's portfolio script on a synthetic home, scripts/budget and scripts/eval against a stub claude, and vale on published
+#   6. install.sh, gear-outfit's script and map-scout's portfolio script on a synthetic home, gear-heal's helper on synthetic repos, scripts/quote-check on stub pages, scripts/budget and scripts/eval against a stub claude, and vale on published
 #      docs where it is installed
 #   7. every retro since the audit log began has an entry in docs/audit-log.md
 #   8. the machine-checkable items of docs/public-repo-standard.md
@@ -127,9 +127,23 @@ outfit_tests() {  # print only the failed assertions, keep the suite's status
   return "$rc"
 }
 
+heal_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(scripts/heal.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep 'FAIL' <<<"$out"
+  return "$rc"
+}
+
 portfolio_tests() {  # print only the failed assertions, keep the suite's status
   local out rc=0
   out=$(scripts/portfolio.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep 'FAIL' <<<"$out"
+  return "$rc"
+}
+
+quote_check_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(scripts/quote-check.test.sh 2>&1) || rc=$?
   ((rc == 0)) || grep 'FAIL' <<<"$out"
   return "$rc"
 }
@@ -251,7 +265,53 @@ retro_evidence_test() {
   "${g[@]}" add retros && "${g[@]}" commit -q -m "test: papercut"
   "${g[@]}" switch -q main
   out=$(HOME=$t CLAUDE_CONFIG_DIR=$t/cfg GUARD_DENYLIST=$t/deny "$t/repo/scripts/retro-evidence" --since 2026-01-01) || rc=$?
+  # --project: a second project, a Skill call logged twice (assistant and api-request-blob),
+  # a project with no transcripts, and a denylisted project.
+  mkdir -p "$t/cfg/projects/-w-other" "$t/cfg/projects/-w-empty" "$t/cfg/projects/-w-zorblax"
+  printf '{"type":"user","uuid":"o1","sessionId":"s1","timestamp":"%s","entrypoint":"cli","message":{"role":"user","content":"stop doing that in other"}}\n' "$ts" >"$t/cfg/projects/-w-other/a.jsonl"
+  printf '{"type":"assistant","uuid":"o2","sessionId":"s1","timestamp":"%s","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"loadout:map-draw"}}]}}\n' "$ts" >>"$t/cfg/projects/-w-other/a.jsonl"
+  printf '{"type":"api-request-blob","uuid":"o3","sessionId":"s1","timestamp":"%s","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"loadout:map-draw"}}]}}\n' "$ts" >>"$t/cfg/projects/-w-other/a.jsonl"
+  printf '{"type":"user","uuid":"z1","sessionId":"s2","timestamp":"%s","entrypoint":"cli","message":{"role":"user","content":"stop it"}}\n' "$ts" >"$t/cfg/projects/-w-zorblax/a.jsonl"
+  local pe=(env HOME=$t CLAUDE_CONFIG_DIR=$t/cfg GUARD_DENYLIST=$t/deny "$t/repo/scripts/retro-evidence" --since 2026-01-01)
+  local pout eout zout prc=0 erc=0 zrc=0
+  eout=$("${pe[@]}" --project /w/empty) || erc=$?
+  zout=$("${pe[@]}" --project /w/zorblax) || zrc=$?
+  # Two Skill blocks in one record both count, and the same record repeated doesn't.
+  local two='{"type":"assistant","uuid":"o4","sessionId":"s1","timestamp":"%s","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"loadout:map-scout"}},{"type":"tool_use","name":"Skill","input":{"skill":"loadout:map-scout"}}]}}\n'
+  # shellcheck disable=SC2059
+  printf "$two$two" "$ts" "$ts" >>"$t/cfg/projects/-w-other/a.jsonl"
+  # With --project the window is 90 days, whatever the last retro's date: today's retro
+  # must not hide a record from ten days ago, and 120 days is outside the window.
+  local i prompt='{"type":"user","uuid":"%s","sessionId":"%s","timestamp":"%s","entrypoint":"cli","message":{"role":"user","content":"%s"}}\n'
+  ago() { date -u -d "$1 days ago" +%FT%TZ 2>/dev/null || date -u -v-"$1"d +%FT%TZ; }
+  mkdir -p "$t/cfg/projects/-w-window"
+  # shellcheck disable=SC2059
+  { printf "$prompt" w1 s3 "$(ago 10)" 'stop using the recent window'
+    printf "$prompt" w2 s4 "$(ago 120)" 'stop using the ancient window'; } >"$t/cfg/projects/-w-window/a.jsonl"
+  mkdir -p "$t/repo/retros"
+  : >"$t/repo/retros/$(date +%F).md"
+  # More transcript names than a pipe holds, older than --since so the loop skips them:
+  # under pipefail, find | grep -q would read these as no transcripts at all.
+  mkdir -p "$t/cfg/projects/-w-many"
+  for i in {1..1500}; do printf '%0200d.jsonl\0' "$i"; done |
+    (cd "$t/cfg/projects/-w-many" && xargs -0 touch -d 2020-01-01T00:00:00)
+  local wout mout wrc=0 mrc=0
+  wout=$(HOME=$t CLAUDE_CONFIG_DIR=$t/cfg GUARD_DENYLIST=$t/deny "$t/repo/scripts/retro-evidence" --project /w/window) || wrc=$?
+  pout=$("${pe[@]}" --project /w/other) || prc=$?
+  mout=$("${pe[@]}" --project /w/many) || mrc=$?
   rm -rf "$t"
+  ((prc == 0 && erc == 0 && zrc == 0 && wrc == 0 && mrc == 0)) || { echo "retro-evidence --project exited $prc $erc $zrc $wrc $mrc"; return 1; }
+  grep -q 'stop doing that in other' <<<"$pout" || { echo "--project lost its own correction"; return 1; }
+  if grep -q 'use env vars instead' <<<"$pout"; then echo "--project printed another project"; return 1; fi
+  grep -q -x -e '- loadout:map-draw: 1 uses' <<<"$pout" || { echo "--project did not count the Skill call once"; return 1; }
+  if grep -q 'Friction log' <<<"$pout"; then echo "--project printed the friction section"; return 1; fi
+  grep -q 'no transcripts' <<<"$eout" || { echo "an empty project has no clear line"; return 1; }
+  if grep -q 'stop it' <<<"$zout"; then echo "--project read a denylisted project"; return 1; fi
+  grep -q ' 1 skipped' <<<"$zout" || { echo "--project did not count the denylisted transcript as skipped"; return 1; }
+  grep -q -x -e '- loadout:map-scout: 2 uses' <<<"$pout" || { echo "--project lost a second Skill block in one record"; return 1; }
+  grep -q 'stop using the recent window' <<<"$wout" || { echo "--project took its default window from the last retro"; return 1; }
+  if grep -q 'stop using the ancient window' <<<"$wout"; then echo "--project read past 90 days"; return 1; fi
+  if grep -q 'no transcripts' <<<"$mout"; then echo "a project with many transcripts reported none"; return 1; fi
   ((rc == 0)) || { echo "retro-evidence exited $rc"; return 1; }
   grep -q 'use env vars instead' <<<"$out" || { echo "the correction is missing"; return 1; }
   grep -q 'open branch papercut/check-test' <<<"$out" || { echo "the papercut branch is missing"; return 1; }
@@ -337,6 +397,8 @@ step 'install layering tests' install_tests
 step 'budget script tests' budget_tests
 step 'gear-outfit tests' outfit_tests
 step 'portfolio tests' portfolio_tests
+step 'quote check tests' quote_check_tests
+step 'gear-heal helper tests' heal_tests
 step 'eval wrapper tests' eval_tests
 step 'audit log covers every retro' audit_log_current
 step 'prose lint' prose_lint

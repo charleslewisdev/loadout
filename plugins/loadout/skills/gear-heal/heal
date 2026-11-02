@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# gear-heal's way to the loadout checkout from any other repository.
+#
+#   heal mode                            prints harness or repo
+#   heal evidence [--since yyyy-mm-dd]   scripts/retro-evidence for the current repo
+#   heal scan <file>                     guard/scan text <file>, denylist required
+#
+# A Bash permission rule can't hold $LOADOUT_REPO: rules don't expand it, and Claude
+# Code won't match a command that starts with a variable. This script has a path a
+# rule can name. Exits 2 on bad arguments, and 3 when the checkout can't be reached
+# or `scan` has no denylist. `evidence` keeps retro-evidence's exit codes.
+#
+# Harness mode runs the current repo's own scripts, so a repo has to earn it: its
+# marketplace must name loadout and, on an installed machine, $LOADOUT_REPO must be
+# this repo. With $LOADOUT_REPO unset, as in a fresh clone, the marketplace decides,
+# so SKILL.md grants none of the repo's scripts. A relative $LOADOUT_REPO would be
+# whatever the current repo makes of it, so it counts as a checkout that can't be used.
+set -uo pipefail
+
+repo=${LOADOUT_REPO:-}
+need() {  # relative path of the tool in the checkout
+  if [[ -z $repo ]]; then
+    echo "heal: LOADOUT_REPO is unset, so $1 is out of reach"
+    exit 3
+  fi
+  if [[ $repo != /* || ! -x $repo/$1 ]]; then
+    echo "heal: no $1 in \$LOADOUT_REPO"
+    exit 3
+  fi
+}
+
+mode() {
+  local top
+  top=$(git rev-parse --show-toplevel 2>/dev/null) || { echo repo; return; }
+  jq -e '.name == "loadout"' "$top/.claude-plugin/marketplace.json" >/dev/null 2>&1 || { echo repo; return; }
+  if [[ -n $repo && ($repo != /* || $(CDPATH='' cd -- "$repo" 2>/dev/null && pwd -P) != "$(cd "$top" && pwd -P)") ]]; then
+    echo repo
+    return
+  fi
+  echo harness
+}
+
+case ${1:-} in
+  mode)
+    [[ $# -eq 1 ]] || { echo "usage: heal mode" >&2; exit 2; }
+    mode
+    ;;
+  evidence)
+    shift
+    [[ $# -eq 0 || ($# -eq 2 && $1 == --since) ]] || { echo "usage: heal evidence [--since yyyy-mm-dd]" >&2; exit 2; }
+    need scripts/retro-evidence
+    top=$(git rev-parse --show-toplevel) || exit 2
+    exec "$repo/scripts/retro-evidence" --project "$top" "$@"
+    ;;
+  scan)
+    [[ $# -eq 2 ]] || { echo "usage: heal scan <file>" >&2; exit 2; }
+    need guard/scan
+    # The same default as guard/scan. Without a denylist, it would pass on secrets alone.
+    deny=${GUARD_DENYLIST:-${HOME:-}/.config/loadout-guard/denylist}
+    if [[ ! -f $deny || ! -r $deny ]]; then
+      echo "heal: no readable denylist, so the scan did not run"
+      exit 3
+    fi
+    GUARD_REQUIRE_DENYLIST=1 exec "$repo/guard/scan" text "$2"
+    ;;
+  *)
+    sed -n '4,6s/^# \{0,1\}//p' "$0" >&2
+    exit 2
+    ;;
+esac

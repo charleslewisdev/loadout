@@ -86,6 +86,31 @@ Be careful with session-start output. It enters context and is sent again after 
 
 Don't rebuild what's already there, either. Claude Code puts the branch, git status, and recent commits into every session started in a repo, so a session-context hook would repeat them for about 80 tokens per session and per compaction. And I'd keep register out of per-prompt hooks unless it drifts, because they cost tokens every turn. If it does drift by turn eight, a hook of about 60 tokens per turn is the next lever.
 
+### Pack light: write the CLAUDE.md
+
+Every line of a project CLAUDE.md "takes a little of Claude's attention on *every* task, whether it's relevant or not" ([best practices](https://code.claude.com/docs/en/best-practices)). So a line stays only if it's "what Claude couldn't work out from the code itself". Four kinds pass that test:
+
+- **Commands:** "the exact test, typecheck, and lint commands, and how to run a single test file".
+- **Misleading code:** "an old pattern that's everywhere but that new code must not copy, or a directory that looks unused but isn't".
+- **Decisions outside the repo:** "which error helper the team settled on, how deploys work, what needs a migration review".
+- **Repeat corrections:** "Anything you've had to correct twice already".
+
+Architecture overviews and file listings fail it, because "Claude reads the repo itself. Only write down what isn't in there." [`templates/CLAUDE.md`](templates/CLAUDE.md) uses the docs' three headings: Commands, Conventions and Gotchas. The memory docs say to "target under 200 lines per CLAUDE.md file", and [section 3](#3-give-every-surface-a-budget) sets my target lower.
+
+You don't have to start from a blank file:
+
+1. Run `/init`, which "generates a starting version from your codebase". "From there the work is mostly removing lines."
+2. Run `/doctor`, which "suggests cuts for anything Claude can already work out from the code".
+3. Run `/doctor prompt-audit`, which "flags instructions that were written for older models, point at files that no longer exist, or contradict each other". It only reports: "nothing in your files changes until you ask Claude to apply them" ([memory docs](https://code.claude.com/docs/en/memory)).
+
+Then move each line that passed the test but sits in the wrong place:
+
+- **A rule that can't bend goes in a hook or a deny rule.** "`CLAUDE.md` is for guidelines, and Claude is allowed to decide a guideline doesn't apply." Stronger wording won't fix a missed line, since "piling on emphasis mostly makes Claude over-apply the rule".
+- **A rule for one part of the code goes in `.claude/rules/`** with a `paths:` filter, "so it only loads when Claude is actually working there".
+- **A procedure goes in a skill.** "A long release procedure sitting in a skill doesn't weigh on your unrelated bug fix the way it would in `CLAUDE.md`."
+
+To run these tests over an existing file, line by line, use [`/loadout:gear-heal`](#9-schedule-the-deletion).
+
 ### Ship it to every machine
 
 An installer merges one JSON profile into `~/.claude/settings.json`, and the repo itself is a plugin marketplace. You need both, because a plugin can't set `outputStyle` or ship your user CLAUDE.md, and its own `settings.json` can set only `agent` and `subagentStatusLine`. Avoid a `directory` marketplace: it stores an absolute path in `~/.claude/plugins/known_marketplaces.json`, so it only works where the checkout sits at the same path.
@@ -108,17 +133,17 @@ A fork needs none of this: with no `--machine` file and no notes, every public s
 
 ## 3. Give every surface a budget
 
-Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, skill bodies and skill descriptions, from November 1.
+Every always-on surface gets a target and a ceiling. The "Now" column is from October 31, 2026, except the harness share, from November 1, and skill bodies and skill descriptions, from November 2.
 
 | Surface | Target | Ceiling | Now | Basis |
 | --- | --- | --- | --- | --- |
 | Harness share | About 3,000 tokens | 6,000 tokens | 4,442 | About 3% of a 200k window above the vendor floor |
 | Output style body | 60 lines, 600 tokens | 100 lines, 1,000 tokens | 24 lines, about 532 tokens | Anthropic's built-in styles run 250 to 370 tokens, more with examples |
 | User CLAUDE.md | About 30 lines | 200 lines | 30 lines | The docs: "target under 200 lines per CLAUDE.md file" |
-| Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, pitfalls |
+| Project CLAUDE.md | About 80 lines | 200 lines | Template under 20 | Build, test, conventions that differ, gotchas |
 | SKILL.md body | Under 150 lines | 500 lines | At most 130 lines | The docs: "Keep `SKILL.md` under 500 lines" |
-| One skill description | | 200 characters | 132 to 188 | The listing budget in [section 5](#5-equip-skills-that-fire) |
-| All harness descriptions | | 5,000 characters | 2,126 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
+| One skill description | | 200 characters | 132 to 200 | The listing budget in [section 5](#5-equip-skills-that-fire) |
+| All harness descriptions | | 5,000 characters | 2,310 | The listing is window × 4 × 0.01 characters: 8,000 on a 200k model |
 | Session-start output | Nothing on a configured machine | 300 characters | 0 | Re-sent after every compaction; checked by hand, not linted |
 
 The 200-line ceiling rests on token cost, not adherence. A factorial study found compliance of 60.0, 65.2, 67.7, and 64.0% at 25, 100, 250, and 500 lines, and the size effect was not significant ([arXiv 2605.10039](https://arxiv.org/abs/2605.10039)). The docs still warn that "Bloated CLAUDE.md files cause Claude to ignore your actual instructions!" ([best practices](https://code.claude.com/docs/en/best-practices)).
@@ -151,7 +176,7 @@ Every enabled skill puts its name and description into every session. The space 
 
 Going over budget doesn't remove anything. The lowest-scoring skills lose their description and show as a bare name, and subagents on 200k models see that cut list. The score is uses times max(0.5^(days since use / 7), 0.1). A skill with `disable-model-invocation: true` stays out of the listing entirely.
 
-So keep each description under 200 characters, and say what the skill does and when to use it. On November 1, 2026, my thirteen skills hold 2,126 characters, and the eight the model can pick hold 1,400. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
+So keep each description under 200 characters, and say what the skill does and when to use it. On November 2, 2026, my fourteen skills hold 2,310 characters, and the eight the model can pick hold 1,426. The Haiku listing in September was still over budget, 34 skills and 17,981 characters against 8,000, almost all from bundled and account-synced skills. An over-budget listing also costs you the descriptions that get cut.
 
 Signing in with a claude.ai account adds that account's enabled skills and connectors to every Claude Code session, on every machine, and they don't show up in your plugin list. Mine cost 7,038 of a 9,016 share. You can trim them per machine in `~/.claude/settings.json` without changing the account:
 
@@ -263,6 +288,8 @@ Harnesses grow unless something pushes back, so the pushback gets a calendar. `/
 
 The retro works on a `retro/<date>` branch. It reads the friction log, my corrections in recent transcripts, memory files nobody read in 90 days, the budgets, and skill usage, then writes one dated file listing each proposal with its evidence. It ends in one pull request. Nothing reaches rules or skills until I merge it, and changes to local memory wait for my yes. Avoid scheduled rewrites of instruction files, since wholesale rewrites are exactly how files lose instructions and then regrow. If two retro dates pass with nothing produced, the fallback is a calendar reminder to run `/skill-doctor` and delete.
 
+The retro reads your own friction. `/loadout:gear-heal` checks the setup against the outside world and the repo in front of it, and it's typed-only. In a `loadout` checkout it audits the harness: quotes, the Claude Code changelog, best practices and the budgets. In any other repo it audits that repo's instruction files, and gives each line one verdict: keep, cut, or move to a hook, a path rule or a skill. Run `/doctor prompt-audit` first, because `gear-heal` doesn't repeat it. Everything lands as one pull request on `heal/<yyyy-mm-dd>`, and the skill never merges. Both modes clear the 0.80 pass mark on fixture repos on Sonnet 5 and Opus 5.5, and [the eval results](docs/eval-results.md) give the scores.
+
 Give a retro skill narrow permissions. `Bash(git *)` pre-approves `git push origin HEAD:main` on an unprotected branch. Unscoped Read, Grep, and Glob pre-approve reading transcripts, and unscoped Edit and Write pre-approve memory edits the procedure said to wait for. Instructions alone don't hold: in sandbox runs the model read files the skill told it not to. List the exact commands a skill needs.
 
 Auto mode is a second permission system with its own settings, so an allow rule won't explain or fix one of its denials. `autoMode.environment` gives it facts it can't know, such as an organization that also counts as source control. Include the literal `"$defaults"` in any `autoMode` array, or that array replaces the built-in rules. Auto mode refuses a session that tries to widen its own permissions, so `/loadout:gear-outfit` writes a plan and leaves applying it to you. Its script refuses to run inside a session, but that only stops accidents, because a process running as you can fake a terminal. The permission system is the boundary.
@@ -359,15 +386,15 @@ And some reviews caught me in the act. A review of an early draft of this guide 
 
 ## Sources
 
-Token counts, timings, and eval scores come from `claude -p` token accounting, a logging proxy, greps of the installed binary, or this repo's scripts. I opened each published source below on September 21, 2026, and checked it against the claim it supports.
+Token counts, timings, and eval scores come from `claude -p` token accounting, a logging proxy, greps of the installed binary, or this repo's scripts. I opened each published source below on September 21, 2026, and checked it against the claim it supports. The exception is the CLAUDE.md advice in section 2, which I checked on November 2, 2026. For Anthropic quotes, `scripts/quote-check` is the current record: it compares each line of `docs/quotes.tsv` with its live page.
 
 | Source | What it supports here |
 | --- | --- |
 | [The new rules of context engineering for Claude 5 generation models](https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models), Anthropic, July 24, 2026 | The vendor removed over 80% of its system prompt |
-| [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices), Anthropic | The prune test; deleting instructions Claude already follows |
+| [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices), Anthropic | The prune test; deleting instructions Claude already follows; what belongs in CLAUDE.md, and when a line moves to a hook, a path rule or a skill; `/init` and `/doctor` |
 | [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices), Anthropic | 500-line skill bodies, reference files that cost nothing until read, the nested-reference warning, evaluations first |
 | [Prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices), Anthropic | Normal prompting instead of "CRITICAL: You MUST" |
-| Claude Code docs: [memory](https://code.claude.com/docs/en/memory), [output styles](https://code.claude.com/docs/en/output-styles), [skills](https://code.claude.com/docs/en/skills), [hooks](https://code.claude.com/docs/en/hooks), [plugin evals](https://code.claude.com/docs/en/plugin-evals), [plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) | CLAUDE.md delivery and the 200-line target, imports loading at launch, style delivery, hook output, eval arms and report publishing |
+| Claude Code docs: [memory](https://code.claude.com/docs/en/memory), [output styles](https://code.claude.com/docs/en/output-styles), [skills](https://code.claude.com/docs/en/skills), [hooks](https://code.claude.com/docs/en/hooks), [plugin evals](https://code.claude.com/docs/en/plugin-evals), [plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) | CLAUDE.md delivery and the 200-line target, imports loading at launch, what `/doctor prompt-audit` changes, style delivery, hook output, eval arms and report publishing |
 | [claude-plugins-official](https://github.com/anthropics/claude-plugins-official), Anthropic | The code-review plugin's cut-off of 80 and its no-build rule |
 | [arXiv 2608.11095](https://arxiv.org/abs/2608.11095), Chakrabarti, 2026 | Instructions leave mostly in wholesale rewrites, and files grow faster afterwards |
 | [arXiv 2605.10039](https://arxiv.org/abs/2605.10039), McMillan, 2026 | CLAUDE.md size did not significantly move compliance between 25 and 500 lines |

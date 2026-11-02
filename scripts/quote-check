@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# Checks the guide's pasted Anthropic quotes against their live pages.
+#
+#   scripts/quote-check [--manifest FILE] [--guide FILE]
+#
+# The manifest (docs/quotes.tsv) holds `url<TAB>quote` lines; `#` lines are comments.
+# A code.claude.com or platform.claude.com page is fetched as `<url>.md`; any other
+# page is fetched as it is and stripped of tags. Quote and page are normalized
+# alike: emphasis marks, backticks and link targets dropped, common HTML entities
+# decoded, curly quotes and dashes unified, whitespace collapsed. Each quote must
+# appear in its page and in the guide. This reaches the network, so it stays out of
+# scripts/check and CI. With QUOTE_CHECK_PAGES set it reads
+# $QUOTE_CHECK_PAGES/<sha256 of the url> instead, which is how the test runs.
+#
+# Exit 0 when every quote holds, 2 when a page can't be fetched, and 1 when a quote is
+# missing, a quote normalizes to nothing, a URL isn't https, or the manifest holds no
+# quotes.
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+manifest=$root/docs/quotes.tsv
+guide=$root/WRITING-AN-EFFECTIVE-HARNESS.md
+while (($#)); do
+  case $1 in
+    --manifest) manifest=${2:?--manifest needs a file}; shift 2 ;;
+    --guide) guide=${2:?--guide needs a file}; shift 2 ;;
+    *) echo "usage: scripts/quote-check [--manifest FILE] [--guide FILE]" >&2; exit 2 ;;
+  esac
+done
+[[ -r $manifest ]] || { echo "quote-check: can't read $manifest" >&2; exit 2; }
+[[ -r $guide ]] || { echo "quote-check: can't read $guide" >&2; exit 2; }
+
+norm() {
+  perl -CSD -0777 -pe '
+    s/&amp;/&/g; s/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g; s/&#0*39;|&#x27;|&apos;/\x27/g; s/&nbsp;/ /g;
+    s/\[([^\]]*)\]\([^)]*\)/$1/g;
+    s/[*_`]//g;
+    s/[\x{2018}\x{2019}]/\x27/g; s/[\x{201C}\x{201D}]/"/g; s/[\x{2013}\x{2014}]/-/g;
+    s/\s+/ /g; s/^ | $//g;'
+}
+
+fetch() {  # url; prints the page, nonzero when it can't be had
+  local url=$1
+  if [[ -n ${QUOTE_CHECK_PAGES:-} ]]; then
+    cat "$QUOTE_CHECK_PAGES/$(printf '%s' "$url" | sha256sum | cut -d' ' -f1)" 2>/dev/null || return 1
+  elif [[ $url =~ ^https://(code|platform)\.claude\.com/ ]]; then
+    curl -fsSL --proto =https --proto-redir =https --url "$url.md" </dev/null
+  else
+    curl -fsSL --proto =https --proto-redir =https --url "$url" </dev/null
+  fi | strip_tags "$url"
+}
+
+strip_tags() {  # docs pages are Markdown already; anything else is HTML
+  if [[ $1 =~ ^https://(code|platform)\.claude\.com/ ]]; then cat
+  else perl -0777 -pe 's/<(script|style)\b.*?<\/\1>//gis; s/<[^>]*>//g'; fi
+}
+
+guide_text=$(norm <"$guide")
+declare -A pages=()
+missing=0
+unfetched=0
+n=0
+quotes=0
+
+while IFS= read -r line || [[ -n $line ]]; do
+  n=$((n + 1))
+  [[ -z ${line//[[:space:]]/} || $line == '#'* ]] && continue
+  url=${line%%$'\t'*}
+  quote=${line#*$'\t'}
+  if [[ $url == "$line" || -z $quote ]]; then
+    echo "quote-check: $manifest:$n is not url<TAB>quote"
+    missing=1
+    continue
+  fi
+  if [[ $url != https://* ]]; then
+    echo "quote-check: not an https URL: $url (manifest line $n)"
+    missing=1
+    continue
+  fi
+  q=$(printf '%s' "$quote" | norm)
+  if [[ -z $q ]]; then
+    echo "quote-check: empty once normalized: $url (manifest line $n)"
+    missing=1
+    continue
+  fi
+  quotes=$((quotes + 1))
+  if [[ -z ${pages[$url]+set} ]]; then
+    page=$(fetch "$url" | norm) || page=
+    pages[$url]=$page
+  fi
+  if [[ -z ${pages[$url]} ]]; then
+    echo "quote-check: could not fetch $url (manifest line $n)"
+    unfetched=1
+    continue
+  fi
+  [[ ${pages[$url]} == *"$q"* ]] || { echo "quote-check: not on the page: $url (manifest line $n)"; missing=1; }
+  [[ $guide_text == *"$q"* ]] || { echo "quote-check: not in the guide: $url (manifest line $n)"; missing=1; }
+done <"$manifest"
+
+if ((unfetched)); then exit 2; fi
+if ((missing)); then exit 1; fi
+if ((quotes == 0)); then
+  echo "quote-check: no quotes in $manifest"
+  exit 1
+fi
+echo "quote-check: every quote holds"

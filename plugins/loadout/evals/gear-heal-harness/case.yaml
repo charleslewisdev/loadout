@@ -1,0 +1,55 @@
+# gear-heal harness mode, typed: /loadout:gear-heal in a small loadout-like checkout
+# whose stub quote-check reports one stale quote. The guide's claim rests on that
+# quote, so a fix has to change the claim, not only the words in quote marks. The docs
+# site is out of reach, so the prompt names a saved copy of the page. There's no
+# remote, so it stops after the commit. The plugin's review gate fires on this change and
+# starts a full review, and neither LOADOUT_REVIEW_GATE around scripts/eval nor settings env
+# reaches it. Run with --scaffold --allow-tools Bash Edit Write --disallow-tools Agent
+# --judge-model claude-sonnet-5, with LOADOUT_REPO unset, because any other value turns
+# harness mode off.
+schema_version: "1.1"
+name: gear-heal-harness
+tags: [gear-heal]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 60
+  timeout_seconds: 600
+  allowed_tools: [Read, Grep, Glob, Edit, Write, Bash]
+  prompt: "/loadout:gear-heal I'm skipping /doctor prompt-audit this time. The docs site can't be reached from here: docs/sources/memory.md is a saved copy of the memory page, and the changelog and best practices pages are out of reach, so record them as skipped."
+graders:
+  - name: ran-quote-check
+    type: tool_used
+    tool: Bash
+    input_match: 'scripts/quote-check'
+  - name: on-a-heal-branch
+    type: tool_used
+    tool: Bash
+    input_match: '(switch|checkout)( -c| -b)? heal/\d{4}-\d{2}-\d{2}'
+  - name: audit-entry-added
+    type: regex
+    target: trace
+    pattern: '"name":"(?:Write|Edit)","input":\{[^}]*"file_path":"[^"]*docs/audit-log\.md"|"name":"Bash","input":\{[^}]*>> ?docs/audit-log\.md'
+  - name: committed
+    type: tool_used
+    tool: Bash
+    input_match: 'git commit'
+  - name: main-left-alone
+    type: llm
+    focus: trace
+    criteria: "Judge the order of the Bash calls in the trace. Pass only if the heal/ branch is created before the first git commit, and no later call commits to, merges into or resets main. Fail if any commit lands on main, or if no commit is made."
+  # Regexes, not judges: Sonnet and Haiku judges failed correct work on every run here.
+  # Each pattern was checked against 18 kept traces, and against a bad edit.
+  - name: quote-replaced
+    type: regex
+    target: trace
+    pattern: 'docs/quotes\.tsv"[^\n]{0,900}"new_string":"(?:[^"\\]|\\.)*fewer than 80 lines|fewer than 80 lines[^\n]{0,400}>\s*docs/quotes\.tsv'
+  - name: claim-moved
+    type: regex
+    target: trace
+    pattern: 'WRITING-AN-EFFECTIVE-HARNESS\.md"[^\n]{0,900}"new_string":"(?:(?!500 lines)(?:[^"\\]|\\.))*fewer than 80 lines(?:(?!500 lines)(?:[^"\\]|\\.))*"'
+  - name: audit-entry-shape
+    type: regex
+    target: trace
+    pattern: '## (?!2026-06-01)\d{4}-\d{2}-\d{2}[^\n]*?\*\*CLI:\*\*[^\n]*?\*\*Why:\*\*[^\n]*?\*\*What changed:\*\*[^\n]*?\| Metric \| Before \| After \|[^\n]*?\| Harness share \| 3,300 \|'

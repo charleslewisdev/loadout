@@ -8,6 +8,8 @@ Three cases sit below the pass mark, each with a recorded reason:
 - **`rephrase-a-put-idempotent`:** the case is noisy, scoring 0.00 and 0.67 on the same style. A new sentence about wrong claims reached only 0.17 to 0.33, and it dropped `rephrase-c-put-idempotent` to 0.83, so I left it out.
 - **`map-scout-portfolio-quiet`:** ten runs score 0.77 on Sonnet 5, the pinned model, because 6 of 10 replies add a line such as "no related repos". None named a repo as a hit. On Opus 5.5, `stayed-quiet` passed 10 of 10, and the case scored 0.83. Three rewordings moved Sonnet 5 from 1 clean reply in 6 to about 4 in 10, and no further.
 
+`scripts/eval-summary` lists the newest run of a case whatever its model, so the `gear-heal` rows below show Opus 5.5. On Sonnet 5, the pinned model, all three scored 1.00. Each case ran three times on each model, with `--disallow-tools Agent`, because the review gate otherwise starts a full review inside the run. Judges ran on Sonnet, and `gear-heal-harness` now grades its edits with regexes, because judges failed correct work there.
+
 | Case | Plugin | Uses Bash | Score | Date | CLI |
 | --- | --- | --- | --- | --- | --- |
 | anti-tic | bard | no | 0.97 | 2026-11-02 | 2.1.316 |
@@ -34,6 +36,9 @@ Three cases sit below the pass mark, each with a recorded reason:
 | unraid-with-notes | homelab | no | 1.00 | 2026-11-01 | 2.1.316 |
 | unraid-without-notes | homelab | no | 1.00 | 2026-11-01 | 2.1.316 |
 | bug-hunt-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
+| gear-heal-harness | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
+| gear-heal-publish | loadout | yes | 0.95 | 2026-11-02 | 2.1.316 |
+| gear-heal-repo | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
 | gear-mend-smoke | loadout | yes | 0.92 | 2026-11-02 | 2.1.316 |
 | gear-outfit-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
 | gear-respec-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |

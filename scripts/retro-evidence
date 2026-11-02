@@ -4,27 +4,34 @@
 #   usage      skill usage from ~/.claude.json, names withheld when they match
 #   prompts    the author's corrections, and prompts repeated across sessions
 #
-#   scripts/retro-evidence [--since <yyyy-mm-dd>]
+#   scripts/retro-evidence [--since <yyyy-mm-dd>] [--project <dir>]
+#
+# --project limits the read to one project directory, drops the friction log
+# (it belongs to the harness), and replaces the usage section with the Skill
+# calls in that project's transcripts, counted from assistant records only.
 #
 # Default window: since the last retros/<date>.md, else 90 days, by each record's
-# own timestamp. Reads interactive sessions only (entrypoint sdk-* excluded) and
-# dedupes records by uuid, so a continued session is not counted twice. The retro
+# own timestamp. With --project it's 90 days, because the harness's retros say
+# nothing about another repo. Reads interactive sessions only (entrypoint sdk-*
+# excluded) and dedupes records by uuid, so a continued session is not counted
+# twice. The retro
 # copies this text into a pull request, so it skips every project directory and
 # every whole transcript that matches the identity guard's denylist, in raw or
 # decoded text, filters every output line again, and refuses to run without a
 # valid denylist. Home paths become ~.
 set -euo pipefail
 
-usage() { echo "usage: scripts/retro-evidence [--since yyyy-mm-dd]" >&2; exit 2; }
+usage() { echo "usage: scripts/retro-evidence [--since yyyy-mm-dd] [--project dir]" >&2; exit 2; }
 root=$(cd "$(dirname "$0")/.." && pwd)
-since=''
+since='' project=''
 while [[ $# -gt 0 ]]; do
   case $1 in
     --since) [[ $# -ge 2 ]] || usage; since=$2; shift 2 ;;
+    --project) [[ $# -ge 2 && -n $2 ]] || usage; project=$2; shift 2 ;;
     *) usage ;;
   esac
 done
-if [[ -z $since ]]; then
+if [[ -z $since && -z $project ]]; then
   last=$(ls "$root"/retros/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md 2>/dev/null | sort | tail -1) || true
   since=${last:+$(basename "$last" .md)}
 fi
@@ -46,6 +53,12 @@ if [[ ! -s $tmp/deny ]] || ((rc > 1)); then
   exit 2
 fi
 enc=${HOME//\//-}
+# Claude Code names a project directory after its path, every non-alphanumeric as -.
+only=''
+if [[ -n $project ]]; then
+  [[ -d $project ]] && project=$(cd "$project" && pwd -P)
+  only=$(sed -E 's/[^A-Za-z0-9]/-/g' <<<"$project")
+fi
 # A term hides from word-boundary patterns inside snake_case or camelCase, so
 # every check also reads a copy with _ as a space and capitals split.
 norm() { sed -E 's/_/ /g; s/([a-z0-9])([A-Z])/\1 \2/g'; }
@@ -61,8 +74,10 @@ private() {
 read_n=0 skipped=0 printmode=0
 : >"$tmp/prompts"
 : >"$tmp/uuids"
+: >"$tmp/skills"
 for dir in "$config"/projects/*/; do
   [[ -d $dir ]] || continue
+  [[ -z $only || $(basename "$dir") == "$only" ]] || continue
   name=$(basename "$dir")
   name=${name//"$enc"/\~}
   if private <<<"$name"; then
@@ -82,6 +97,22 @@ for dir in "$config"/projects/*/; do
       continue
     fi
     read_n=$((read_n + 1))
+    if [[ -n $only ]]; then
+      # assistant records only: an api-request-blob repeats the same tool call.
+      # A record repeats whole, so uuid plus block index keeps two calls in one record.
+      { jq -r --arg since "$since" 'select(.type == "assistant" and ((.timestamp // "") >= $since))
+          | . as $r | .message.content | arrays | to_entries[]
+          | select(.value.type == "tool_use" and .value.name == "Skill")
+          | "\($r.uuid // "")\t\(.key)\t\(.value.input.skill // "")"' "$tmp/records" 2>/dev/null || true; } |
+        while IFS=$'\t' read -r uuid block skill; do
+          [[ -n $skill ]] || continue
+          if [[ -n $uuid ]]; then
+            grep -q -x -F -e "$uuid#$block" "$tmp/uuids" && continue
+            echo "$uuid#$block" >>"$tmp/uuids"
+          fi
+          echo "$skill" >>"$tmp/skills"
+        done
+    fi
     # Typed prompts only: no tool results, injected or harness text, or command echoes.
     { jq -r --arg p "$name" --arg since "$since" '
         select(.type == "user" and (.isMeta | not) and (.isCompactSummary | not) and ((.timestamp // "") >= $since))
@@ -103,6 +134,10 @@ done
 # ---- report -------------------------------------------------------------------
 {
   echo "Retro evidence since $since: $read_n sessions read, $skipped skipped (denylist), $printmode print-mode runs excluded"
+  if [[ -n $only && -z $(find "$config/projects/$only" -maxdepth 1 -name '*.jsonl' -print -quit 2>/dev/null) ]]; then
+    echo "This project has no transcripts: ${project/#"$HOME"/\~}"
+  fi
+  if [[ -z $only ]]; then
   echo
   echo "## Friction log"
   for f in "$root"/retros/friction/*.md "$root"/retros/friction.md; do
@@ -120,6 +155,11 @@ done
     | "\(.key)\t\(.value.usageCount // 0)\t\(((($now * 1000) - (.value.lastUsedAt // 0)) / 86400000) | floor)"' \
     "$HOME/.claude.json" 2>/dev/null | sort -t$'\t' -k3,3n |
     awk -F'\t' '{ printf "- %s: %s uses, %s days\n", $1, $2, $3 }' || true
+  else
+  echo
+  echo "## Skill calls in this project"
+  sort "$tmp/skills" | uniq -c | sort -rn | awk '{ printf "- %s: %s uses\n", $2, $1 }'
+  fi
   echo
   echo "## Corrections (the author redirecting the model)"
   cut -f4 "$tmp/prompts" >"$tmp/texts"
