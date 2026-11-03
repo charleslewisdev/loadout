@@ -61,7 +61,7 @@ scan --all
 check "the same line in another file isn't excepted" test "$rc" = 1
 "${g[@]}" reset -q --hard HEAD~1
 
-sed -i 's/the zorblax plan/the zorblax plans/' "$r/notes.md"; commit "docs: reworded"
+perl -pi -e 's/the zorblax plan/the zorblax plans/' "$r/notes.md"; commit "docs: reworded"
 scan --all
 check "a changed line isn't excepted" grep -q 'denylist line' <<<"$err"
 "${g[@]}" reset -q --hard HEAD~1
@@ -87,7 +87,7 @@ printf '\\bwibble\\b\n\\bzorblax\\b\n' >"$t/deny"
 scan --all
 check "reordering the denylist keeps exceptions" test "$rc" = 0
 cp "$t/exceptions" "$t/exceptions.keep"
-sed -i '1d' "$t/exceptions"
+perl -ni -e 'print if $. > 1' "$t/exceptions"
 scan --all
 check "dropping one term's exception finds that term" test "$rc" = 1
 cp "$t/exceptions.keep" "$t/exceptions"

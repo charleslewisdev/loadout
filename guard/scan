@@ -358,12 +358,12 @@ case "${1:-}" in
     find -H "$dir" -xdev -print0 >"$tmp/names" 2>"$tmp/walk-errors" &
     wait $! || true
     { perl -0ne 'chomp; print "$_\0" if -f $_ && !-l $_' "$tmp/names" |
-        xargs -0 -r grep -l -Z -a -i -E -f "$tmp/loose" -- >"$tmp/candidates" 2>"$tmp/grep-errors"; } &
+        xargs -0 -r grep -l --null -a -i -E -f "$tmp/loose" -- >"$tmp/candidates" 2>"$tmp/grep-errors"; } &
     rc=0
     wait $! || rc=$?
-    # xargs exits 123 when a grep found nothing or could not read a file; the error
-    # lines say which. Anything else means the prefilter stopped partway.
-    ((rc == 0 || rc == 123)) || { echo "guard: the content prefilter stopped (status $rc)" >&2; exit 2; }
+    # GNU xargs exits 123, and BSD xargs 1, when a grep found nothing or could not
+    # read a file; the error lines say which. Anything else means the prefilter stopped partway.
+    ((rc == 0 || rc == 1 || rc == 123)) || { echo "guard: the content prefilter stopped (status $rc)" >&2; exit 2; }
     cat "$tmp/walk-errors" "$tmp/grep-errors" >"$tmp/errors"
     # The exact check, raw and normalized, on each candidate in 1 MiB chunks that
     # overlap by 4 KiB, and on each path component. A chunk or component is checked
