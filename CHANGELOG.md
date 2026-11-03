@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0, 2026-11-02
+
+### Added
+
+- `repo-raid`, a typed-only, read-only audit of a local repo or a GitHub repo. Lenses cover principles, security, public readiness, docs, code and portfolio, and `--focus` limits a run. A verifier built for audits scores each finding. Lenses read a write-protected snapshot of committed work, and the report stays in `~/.cache/loadout/raids`. A new `PreToolUse` hook, `raid-gate`, limits Explore subagents to Read, Grep and Glob inside the raid while one is live, and it returns at once otherwise. On a GitHub target it sends the repo's settings, and with the portfolio lens your repo list, to the session.
+- Eval cases on a fixture with planted problems and on a clean one, and an offline test of the helper in `scripts/check`.
+- `scripts/check` fails if the skill's copy of the public repo standard differs from `docs/public-repo-standard.md`.
+
 ## 0.12.1, 2026-11-02
 
 ### Fixed

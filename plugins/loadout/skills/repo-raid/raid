@@ -1,0 +1,423 @@
+#!/usr/bin/env bash
+# repo-raid's staging: makes a write-protected snapshot of the target, gathers what the
+# lenses read, and fences the lenses in.
+#
+#   raid start [<path|owner/name|github url>] [--focus lens,lens]
+#   raid save <raid dir>        writes the report from stdin
+#   raid clean <raid dir>       removes the snapshot and facts, and keeps the report
+#   raid gate                   a PreToolUse hook: reads the call as JSON on stdin
+#
+# The target defaults to the current directory. `start` prints key=value lines, and
+# exits 2 on bad arguments and 3 when the target can't be read or cloned.
+#
+# The target is untrusted, and so is its .git: git follows what it finds there, into
+# other repositories and into programs its config names, and `git clone` falls back to
+# the directory above it. So git never opens a local target's .git. The snapshot is a new
+# repository with its own config, and it takes an allowlist by plain copy: objects, refs,
+# HEAD, packed-refs and shallow, regular files only. Alternates, commondir and config
+# stay behind. status then runs from the snapshot's git directory with user config off
+# and submodules ignored, because a submodule's own config can run a program. A linked
+# worktree or a repo cloned with --shared can't be built this way, so it's refused.
+#
+# The snapshot holds committed work only, with no hooks, submodules
+# or LFS downloads, and with symlinks stored as plain text files, so a link can't lead a
+# Read outside it. Ignored files such as .env never enter it. A GitHub target is cloned
+# with your git config, so a filter you configured yourself still applies there.
+#
+# An origin URL is a claim too, so it counts only if GitHub has that repo's root commit,
+# which a repository can't name unless it shares history with the repo it claims.
+#
+# Claude Code's Agent tool can't limit a subagent's tools, and a plugin agent that could
+# would cost context in every session, so lenses run as Explore, which still has Bash.
+# `gate` holds them to Read, Grep and Glob inside the raids directory. A skill's own
+# hook doesn't reach its subagents, and a plugin's does, so this runs on every tool call
+# in every session: it returns before anything slow unless a raid is live, and it acts
+# only on Explore agents in the session that started the raid.
+#
+# Raids live under ~/.cache/loadout/raids, mode 700, because a report can describe an
+# open security hole.
+set -uo pipefail
+umask 077
+
+root=$HOME/.cache/loadout/raids
+if [[ ${1:-} == gate ]] && ! compgen -G "$root/*/active" >/dev/null; then exit 0; fi
+
+here=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
+all_lenses=(principles security public-readiness docs code portfolio)
+log_commits=50
+status_seconds=20 # a FIFO named .gitignore in the target would otherwise hang it
+live_minutes=360 # a raid that never reached clean stops gating after this
+
+die() {  # exit code, message
+  printf 'raid: %s\n' "$(tr '[:cntrl:]' ' ' <<<"$2")" >&2 # a path can't forge a line
+  exit "$1"
+}
+
+has_lens() {  # name, lens...
+  local want=$1 l
+  shift
+  for l in "$@"; do [[ $l == "$want" ]] && return 0; done
+  return 1
+}
+
+# Stock macOS has no timeout, so there the limit is dropped.
+limit() {  # seconds, command...
+  if command -v timeout >/dev/null; then timeout "$@"; else shift; "$@"; fi
+}
+
+# Text from GitHub or a repository: no control characters, capped.
+plain_text() { LC_ALL=C tr -d '\000-\010\013-\037\177' | head -c 20000; }
+
+valid_slug() { [[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; }
+
+github_slug() {  # url or owner/name: prints owner/name, or nothing
+  local slug
+  slug=$(sed -E 's#^(https://github\.com/|ssh://git@github\.com/|git@github\.com:)##; s#/$##; s#\.git$##' <<<"$1")
+  if valid_slug "$slug"; then printf '%s' "$slug"; fi
+}
+
+api() {  # label, gh api path, jq filter: a failed call says so, never its error body
+  local value
+  if value=$(gh api "$2" --jq "$3" 2>/dev/null) && [[ -n $value ]]; then
+    printf '%s: %s\n' "$1" "$(plain_text <<<"$value" | tr '\n' ' ')"
+  else
+    printf '%s: unavailable\n' "$1"
+  fi
+}
+
+settings() {  # owner/name: the endpoints docs/public-repo-standard.md names
+  local repo="repos/$1" branch
+  branch=$(gh api "$repo" --jq .default_branch 2>/dev/null | plain_text)
+  [[ $branch =~ ^[A-Za-z0-9_./-]+$ ]] || branch=main
+  echo "default branch: $branch"
+  api 'secret scanning' "$repo" '.security_and_analysis.secret_scanning.status'
+  api 'push protection' "$repo" '.security_and_analysis.secret_scanning_push_protection.status'
+  if gh api "$repo/vulnerability-alerts" >/dev/null 2>&1; then
+    echo 'dependabot alerts: on'
+  else
+    echo 'dependabot alerts: off or unavailable'
+  fi
+  api 'private vulnerability reporting' "$repo/private-vulnerability-reporting" '.enabled'
+  api 'branch protected' "$repo/branches/$branch" '.protected'
+  api 'classic protection, required checks' "$repo/branches/$branch/protection" '.required_status_checks.contexts // "none"'
+  api 'classic protection, force pushes' "$repo/branches/$branch/protection" '.allow_force_pushes.enabled // "none"'
+  api 'ruleset rules' "$repo/rules/branches/$branch" '[.[].type]'
+  api 'open dependabot alerts, first 100' "$repo/dependabot/alerts?state=open&per_page=100" 'arrays | length'
+  api 'open secret scanning alerts, first 100' "$repo/secret-scanning/alerts?state=open&per_page=100" 'arrays | length'
+  api 'community profile percent' "$repo/community/profile" '.health_percentage'
+}
+
+guard_scan() {  # snapshot: secrets, identity terms and emails over every ref
+  local scan=${LOADOUT_REPO:-}/guard/scan rc=0
+  if [[ ${LOADOUT_REPO:-} != /* || ! -x $scan ]]; then
+    echo 'guard: unavailable, $LOADOUT_REPO has no guard/scan'
+    return
+  fi
+  # A missing denylist must read as a finding: skipped, it could still exit 0.
+  (cd "$1" && GUARD_REQUIRE_DENYLIST=1 limit 300 "$scan" --all 2>&1) || rc=$?
+  if ((rc > 1)); then
+    echo "guard: unavailable, the scan stopped with exit $rc, and any findings above are partial"
+  else
+    echo "guard exit: $rc"
+  fi
+}
+
+own_repo() {  # target directory: prints the top of the repository, or why not
+  local top
+  top=$(cd -P -- "$1" && pwd -P) || return 1
+  [[ $top != *[[:cntrl:]]* ]] || { echo 'its path holds a control character'; return 1; }
+  until [[ -e $top/.git || -L $top/.git ]]; do
+    [[ $top != / ]] || { echo 'not a git repository'; return 1; }
+    top=$(dirname "$top")
+  done
+  if [[ -L $top/.git || ! -d $top/.git ]]; then
+    echo '.git is not a directory of its own: raid the main checkout, not a linked worktree'
+    return 1
+  fi
+  printf '%s' "$top"
+}
+
+plain_file() { [[ -f $1 && ! -L $1 ]]; }
+
+own_git() { GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git "$@"; }
+
+snapshot_local() {  # top, snapshot: see the header for why this isn't git clone
+  local gd=$1/.git src=$2 g=$2/.git f
+  own_git init -q --template= "$src" >/dev/null 2>&1 || return 1
+  own_git -C "$src" config core.symlinks false
+  own_git -C "$src" config core.hooksPath /dev/null
+  for f in objects refs; do
+    [[ -d $gd/$f && ! -L $gd/$f ]] || return 1
+  done
+  rm -rf "${g:?}/objects" "${g:?}/refs"
+  limit 600 cp -RP "$gd/objects" "$gd/refs" "$g/" 2>/dev/null </dev/null || return 1
+  rm -rf "${g:?}/objects/info" 2>/dev/null
+  find "$g/objects" "$g/refs" ! -type f ! -type d -delete 2>/dev/null
+  # cp keeps a directory's mode, so pruning a read-only one fails: check that it worked.
+  [[ ! -e $g/objects/info && -z $(find "$g/objects" "$g/refs" ! -type f ! -type d -print -quit) ]] || return 1
+  for f in HEAD packed-refs shallow; do
+    if plain_file "$gd/$f"; then cp "$gd/$f" "$g/$f" || return 1; fi
+  done
+  own_git -C "$src" rev-parse -q --verify HEAD >/dev/null 2>&1 || return 1
+  own_git -C "$src" checkout -q -f >/dev/null 2>&1
+}
+
+origin_confirmed() {  # snapshot, owner/name: GitHub holds this repository's root commit
+  local src=$1 slug=$2 first
+  first=$(git -C "$src" rev-list --max-parents=0 HEAD 2>/dev/null | tail -1)
+  [[ -n $first ]] && [[ $(gh api "repos/$slug/commits/$first" --jq .sha 2>/dev/null) == "$first" ]]
+}
+
+start() {
+  local target='' focus='' have_focus=0
+  while (($#)); do
+    case $1 in
+      --focus)
+        (($# >= 2)) || die 2 '--focus needs a list of lenses'
+        focus=$2 have_focus=1
+        shift 2
+        ;;
+      --focus=*)
+        focus=${1#--focus=} have_focus=1
+        shift
+        ;;
+      -*) die 2 "unknown option: $1" ;;
+      *)
+        [[ -z $target ]] || die 2 'give one target'
+        target=$1
+        shift
+        ;;
+    esac
+  done
+  target=${target:-.}
+
+  # Which lenses, before anything is cloned.
+  local lenses=() name
+  if ((have_focus)); then
+    IFS=, read -r -a lenses <<<"$focus"
+    ((${#lenses[@]})) || die 2 '--focus names no lens'
+    local named=("${lenses[@]}")
+    lenses=()
+    for name in "${named[@]}"; do
+      has_lens "$name" "${all_lenses[@]}" || die 2 "unknown lens: $name (lenses: ${all_lenses[*]})"
+      has_lens "$name" ${lenses[@]+"${lenses[@]}"} || lenses+=("$name")
+    done
+  else
+    lenses=("${all_lenses[@]}")
+  fi
+
+  # Local path, or GitHub. A directory wins over an owner/name of the same shape.
+  local slug='' top='' dirty=0 origin='' claimed=''
+  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+  if [[ -d $target ]]; then
+    top=$(own_repo "$target") || die 3 "can't raid $target: $top"
+    if plain_file "$top/.git/config"; then
+      origin=$(own_git config --file "$top/.git/config" --get remote.origin.url 2>/dev/null | plain_text)
+    fi
+    claimed=$(github_slug "$origin")
+  else
+    slug=$(github_slug "$target")
+    [[ -n $slug ]] || die 2 "not a directory, owner/name or GitHub URL: $target"
+    command -v gh >/dev/null || die 3 "gh isn't installed, so $slug can't be cloned"
+  fi
+
+  local base id
+  base=${slug:-$(basename "$top")}
+  # The prefix keeps a target named .x out of a dot directory, which a glob would miss.
+  id=raid-$(tr -c 'A-Za-z0-9_.-' '-' <<<"${base//\//-}" | sed 's/-*$//')-$(date +%F)
+  mkdir -p "$root" || die 3 "can't create $root"
+  chmod 700 "$root"
+  dir=$(mktemp -d "$root/$id-XXXXXX") || die 3 "can't create a raid directory in $root"
+  # Set when the raid is ready: until then, a failure leaves nothing behind.
+  ready=0
+  trap '((ready)) || { chmod -R u+rwx "$dir" 2>/dev/null; rm -rf "$dir"; }' EXIT
+
+  local src=$dir/src clone=(--template= --no-recurse-submodules -c core.symlinks=false
+    -c core.hooksPath=/dev/null -c core.fsmonitor=false)
+  export GIT_LFS_SKIP_SMUDGE=1 GIT_TERMINAL_PROMPT=0
+  if [[ -n $top ]]; then
+    snapshot_local "$top" "$src" || die 3 "can't read the commits in $top, which may be a linked or shared repository"
+    # Keep the origin as it was: the guard keys its reviewed exceptions on it.
+    if [[ -n $origin ]]; then git -C "$src" remote add origin "$origin"; fi
+  else
+    gh repo clone "$slug" "$src" -- -q "${clone[@]}" >/dev/null 2>&1 || die 3 "can't clone $slug"
+  fi
+  local head
+  head=$(git -C "$src" rev-parse -q --verify HEAD 2>/dev/null) || die 3 'the target has no commits'
+
+  local unconfirmed=''
+  if [[ -n $claimed ]] && command -v gh >/dev/null; then
+    if origin_confirmed "$src" "$claimed"; then slug=$claimed; else unconfirmed=$claimed; fi
+  elif [[ -n $claimed ]]; then
+    unconfirmed=$claimed
+  fi
+
+  # The snapshot's git directory, so the target's filters and hooks stay out of it, and
+  # its index is the one that gets refreshed.
+  if [[ -n $top ]]; then
+    local changed
+    if changed=$(limit "$status_seconds" env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git --no-optional-locks \
+      --git-dir="$src/.git" --work-tree="$top" -c core.fsmonitor=false \
+      status --porcelain --ignore-submodules=all 2>/dev/null </dev/null); then
+      dirty=$(grep -c . <<<"$changed")
+    else
+      dirty=unknown
+    fi
+  fi
+
+  local visibility=local
+  if [[ -n $slug ]]; then
+    visibility=$(gh repo view "$slug" --json visibility --jq .visibility 2>/dev/null | tr '[:upper:]' '[:lower:]' | plain_text)
+    [[ $visibility =~ ^(public|private|internal)$ ]] || visibility=unknown
+  fi
+
+  # Public readiness runs on public repos, unless asked for by name.
+  local skipped=()
+  if ((!have_focus)) && [[ $visibility != public ]]; then
+    local kept=()
+    for name in "${lenses[@]}"; do [[ $name == public-readiness ]] || kept+=("$name"); done
+    lenses=("${kept[@]}")
+    skipped=("public-readiness (visibility is $visibility)")
+  fi
+
+  # What the lenses need that a read-only tool can't fetch.
+  local facts=$dir/facts
+  mkdir "$facts" || die 3 "can't create $facts"
+  # git quotes unusual names, so a file name can't forge a line.
+  git -C "$src" -c core.quotePath=true ls-files >"$facts/tree.txt"
+  git -C "$src" log --no-color --date=short --format='%h %ad %s' -n "$log_commits" | plain_text >"$facts/log.txt"
+  if has_lens principles "${lenses[@]}" && [[ -r $HOME/.claude/CLAUDE.md ]]; then
+    cp "$HOME/.claude/CLAUDE.md" "$facts/conventions.md"
+  fi
+  if has_lens docs "${lenses[@]}"; then
+    cat "$here/../lore-scribe/SKILL.md" "$here/../lore-scribe/references/style.md" >"$facts/lore-scribe.md" 2>/dev/null ||
+      echo 'lore-scribe rules: unavailable' >"$facts/lore-scribe.md"
+  fi
+  if has_lens portfolio "${lenses[@]}"; then
+    "$here/../map-scout/portfolio" 2>/dev/null | grep -v '^End of lookup\.' >"$facts/portfolio.txt"
+    [[ -s $facts/portfolio.txt ]] || echo 'portfolio: unavailable' >"$facts/portfolio.txt"
+  fi
+  if has_lens public-readiness "${lenses[@]}"; then
+    cp "$here/public-repo-standard.md" "$facts/standard.md"
+  fi
+  if has_lens security "${lenses[@]}" || has_lens public-readiness "${lenses[@]}"; then
+    # A clone holds branches and tags. GitHub also publishes pull request refs, and a
+    # local clone misses what only the remote has, so a scan of every ref needs them.
+    if [[ -n $slug ]]; then
+      if [[ -n $top ]]; then git -C "$src" remote set-url origin "https://github.com/$slug"; fi
+      limit 120 git -C "$src" -c core.hooksPath=/dev/null fetch -q origin \
+        '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*' '+refs/pull/*/head:refs/pr/*' >/dev/null 2>&1 ||
+        echo 'guard: unavailable for remote branches and pull request refs, the fetch failed' >>"$facts/guard.txt"
+      if [[ -n $top ]]; then git -C "$src" remote set-url origin "$origin"; fi
+    fi
+    guard_scan "$src" >>"$facts/guard.txt"
+    if [[ -n $slug ]]; then
+      settings "$slug" >"$facts/settings.txt"
+    else
+      echo 'settings: unavailable, this repository has no confirmed GitHub origin' >"$facts/settings.txt"
+    fi
+  fi
+
+  chmod -R a-w "$src"
+  printf '%s\n' "${CLAUDE_CODE_SESSION_ID:-}" >"$dir/active"
+  ready=1
+  printf 'raid=%s\nsnapshot=%s\nreport=%s\ntarget=%s\nvisibility=%s\nhead=%s\nuncommitted_files=%s\nunconfirmed_origin=%s\nlenses=%s\nskipped=%s\n' \
+    "$dir" "$src" "$dir/report.md" "${slug:-$top}" "$visibility" "$head" "$dirty" "${unconfirmed:-none}" "${lenses[*]}" "${skipped[*]:-none}"
+}
+
+raid_dir() {  # argument: prints it if it's a direct child of the raids directory
+  local dir parent
+  dir=$(cd -P -- "$1" 2>/dev/null && pwd -P) || die 2 "not a raid directory: $1"
+  parent=$(cd -P -- "$root" 2>/dev/null && pwd -P) || die 2 "not a raid directory: $1"
+  [[ $(dirname "$dir") == "$parent" ]] || die 2 "not a raid directory: $1"
+  printf '%s' "$dir"
+}
+
+# A path rule for Write never matches, and an Edit rule didn't reach a report in a
+# restricted session, so the report travels through the command the skill already holds.
+save() {
+  (($# == 1)) || die 2 'usage: raid save <raid dir>'
+  local dir
+  dir=$(raid_dir "$1") || exit 2
+  [[ ! -L $dir/report.md ]] || die 3 'the report path is a link'
+  cat >"$dir/report.md" || die 3 "can't write the report"
+  [[ -s $dir/report.md ]] || die 3 'the report is empty'
+  echo "saved $dir/report.md"
+}
+
+clean() {
+  (($# == 1)) || die 2 'usage: raid clean <raid dir>'
+  local dir
+  dir=$(raid_dir "$1") || exit 2
+  chmod -R u+rwx "$dir/src" 2>/dev/null
+  rm -rf "${dir:?}/src" "${dir:?}/facts" "${dir:?}/active"
+}
+
+deny() {  # reason; holds with no jq, so a broken hook can't let a lens through
+  jq -n --arg r "repo-raid: $1" '{hookSpecificOutput: {hookEventName: "PreToolUse",
+    permissionDecision: "deny", permissionDecisionReason: $r}}' 2>/dev/null ||
+    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"repo-raid: denied"}}'
+  exit 0
+}
+
+climbs() { [[ $1 == .. || $1 == ../* || $1 == */../* || $1 == */.. ]]; }
+
+inside() {  # path: within a live raid of this session, with no way back out
+  local d
+  climbs "$1" && return 1
+  for d in "${raids[@]}"; do
+    [[ $1 == "$d"/* ]] && return 0
+  done
+  return 1
+}
+
+gate() {
+  local input kind tool value pattern session marker owner dir
+  raids=()
+  input=$(cat)
+  kind=$(jq -r '.agent_type // ""' <<<"$input" 2>/dev/null) || deny 'unreadable tool call'
+  [[ $kind == Explore ]] || exit 0
+  session=$(jq -r '.session_id // ""' <<<"$input")
+  while IFS= read -r marker; do
+    owner=$(<"$marker")
+    [[ -z $owner || $owner == "$session" ]] || continue
+    dir=$(dirname "$marker")
+    raids+=("$dir" "$(cd -P -- "$dir" && pwd -P)")
+  done < <(find "$root/" -mindepth 2 -maxdepth 2 -name active -mmin "-$live_minutes" 2>/dev/null)
+  ((${#raids[@]})) || exit 0
+  tool=$(jq -r '.tool_name // ""' <<<"$input")
+  case $tool in
+    Read) value=$(jq -r '.tool_input.file_path // ""' <<<"$input") ;;
+    Grep) value=$(jq -r '.tool_input.path // ""' <<<"$input") pattern=$(jq -r '.tool_input.glob // ""' <<<"$input") ;;
+    Glob) value=$(jq -r '.tool_input.path // ""' <<<"$input") pattern=$(jq -r '.tool_input.pattern // ""' <<<"$input") ;;
+    SubagentHandback | StructuredOutput) exit 0 ;;
+    *) deny "$tool is off during a raid: use Read, Grep and Glob on the snapshot and facts" ;;
+  esac
+  inside "$value" || deny "stay inside the snapshot and facts, and give an absolute path: $value"
+  if [[ ${pattern:-} == /* || ${pattern:-} == *{/* || ${pattern:-} == *,/* ]] || climbs "${pattern:-}"; then
+    deny "a file pattern must stay relative: $pattern"
+  fi
+  exit 0
+}
+
+case ${1:-} in
+  start)
+    shift
+    start "$@"
+    ;;
+  clean)
+    shift
+    clean "$@"
+    ;;
+  save)
+    shift
+    save "$@"
+    ;;
+  gate)
+    gate
+    ;;
+  *)
+    sed -n '5,8s/^# \{0,1\}//p' "$0" >&2
+    exit 2
+    ;;
+esac

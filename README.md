@@ -4,7 +4,7 @@
 
 Every Claude Code session starts at level 1. It doesn't know how you like to work, where your repo breaks convention, or what you learned the hard way last month.
 
-loadout is the gear I hand it at the door: twelve skills, five hooks, and a statusline, packaged as a plugin marketplace with one installer. Two optional plugins add more: `bard` adds a voice, and `homelab` adds server skills. One of the twelve skills is a retro whose favorite move is deleting things.
+loadout is the gear I hand it at the door: thirteen skills, six hooks, and a statusline, packaged as a plugin marketplace with one installer. Two optional plugins add more: `bard` adds a voice, and `homelab` adds server skills. One of the thirteen skills is a retro whose favorite move is deleting things.
 
 This repo is for you if you use Claude Code every day and your CLAUDE.md has started to look like a junk drawer. Fork it and change it, because a harness is personal and this one is mine. If you're auditing a harness for a team, start with [For a team](#for-a-team).
 
@@ -15,8 +15,8 @@ This repo is for you if you use Claude Code every day and your CLAUDE.md has sta
 | Stat | Value | In plain words |
 | --- | --- | --- |
 | **Encumbrance** | 4,449 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
-| **Inventory** | 12 skills, plus 1 in `bard` and 1 in `homelab` | Procedures Claude picks up when they apply, or that you type |
-| **Reflexes** | 5 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
+| **Inventory** | 13 skills, plus 1 in `bard` and 1 in `homelab` | Procedures Claude picks up when they apply, or that you type |
+| **Reflexes** | 6 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
 | **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
 | **Save point** | Every 90 days at most | A retro that opens one pull request of additions and deletions |
 
@@ -98,11 +98,12 @@ To place something new, ask three questions:
 | `gear-mend` | You | Logs one annoyance for the next retro, plus the fix when it's clear |
 | `gear-respec` | You | Runs the retro and proposes what to add and delete |
 | `gear-heal` | You | Audits the harness in a `loadout` checkout, or a repo's instruction files anywhere else, and proposes every change in one pull request |
+| `repo-raid` | You | Audits any repo, read-only, through six lenses and writes a private report: principles, security, public readiness, docs, code and portfolio |
 | `gear-outfit` | You | Recommends settings and permissions from your answers and your real denials, then leaves applying them to you |
 | `scribe-as-me` (`bard`) | You | Drafts text published under your name, and never posts it |
 | `unraid` (`homelab`) | Claude | Deploys and inspects containers on an unRAID server, and reads your local notes for that server's facts |
 
-The five hooks check your configuration at session start, send desktop notifications on stop and on input needed (two hooks), format files where the repo uses prettier or ruff, and run `review-gate`. That last one blocks a stop once per batch of work when two or more files changed since the last `review-party`, so Claude reviews multi-file work before calling it done. Work that's nothing but prose docs passes.
+The six hooks check your configuration at session start, send desktop notifications on stop and on input needed (two hooks), format files where the repo uses prettier or ruff, hold `repo-raid`'s subagents to the raid while one is live, and run `review-gate`. That last one blocks a stop once per batch of work when two or more files changed since the last `review-party`, so Claude reviews multi-file work before calling it done. Work that's nothing but prose docs passes.
 
 ### One ticket, start to finish
 
@@ -114,7 +115,9 @@ The five hooks check your configuration at session start, send desktop notificat
 
 `map-scout` runs a `gh` query on every use, without a prompt. It sends the names and descriptions of up to 100 repos you own or reach through an organization, private ones included, plus the latest commit subjects of the newest 8, to your Claude session. To turn the check off and keep the skill, create the file `~/.config/loadout/no-portfolio`.
 
-Outside the ticket, `gear-stats` reads the sheet, `gear-mend` handles anything that annoys you, `gear-respec` is the periodic save point, `gear-heal` audits the harness or a repo's instruction files, and `gear-outfit` keeps your settings and permissions current.
+`repo-raid` runs the same query in its portfolio lens, and the same file turns that off. It also copies your `~/.claude/CLAUDE.md` into the raid for its principles lens, and all of it stays on your machine and in your session, except a GitHub target's settings, which it reads through `gh`. On a local repo it reads GitHub only if GitHub holds that repo's root commit. It refuses a linked worktree, or a repo cloned with `--shared`: raid the main checkout.
+
+Outside the ticket, `gear-stats` reads the sheet, `gear-mend` handles anything that annoys you, `gear-respec` is the periodic save point, `gear-heal` audits the harness or a repo's instruction files, `repo-raid` audits a whole repo, and `gear-outfit` keeps your settings and permissions current.
 
 ### Add a skill
 
@@ -133,7 +136,7 @@ Reference material should never load by itself. Take a 2,000-term glossary. My a
 
 1. Start from `profiles/example.json`.
 2. Add your commit email to `guard/allowed-emails`, or pre-commit and CI will reject your commits. Keep the existing lines, because the history you forked needs them.
-3. Write a generator for your own identity guard denylist. It prints one extended regex per line to `~/.config/loadout-guard/denylist` (mode 0600), in the shape of `guard/denylist.example`, plus a canary line of your own. Mine isn't published, because its sources are private. `gear-heal` needs it, not only the hooks: without a readable denylist, repo mode's transcript evidence is skipped, and in both modes it stops at a local commit instead of opening a pull request.
+3. Write a generator for your own identity guard denylist. It prints one extended regex per line to `~/.config/loadout-guard/denylist` (mode 0600), in the shape of `guard/denylist.example`, plus a canary line of your own. Mine isn't published, because its sources are private. `gear-heal` needs it, not only the hooks: without a readable denylist, repo mode's transcript evidence is skipped, and in both modes it stops at a local commit instead of opening a pull request. `repo-raid` needs `$LOADOUT_REPO` and the denylist for its scan of every ref: without the checkout it says the scan didn't run, and without the denylist the scan reports that as a finding.
 4. Run `git config core.hooksPath .githooks` so the guard runs, and run `scripts/check` before a PR. [CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
 
 Keep the machinery: the budget script and lint, the eval runner, the hook wrapper, the installer, and the one-store memory rule. Replace the opinions: the style's wording, the skill set, the statusline segments, the hook budgets, and the retro's cadence.

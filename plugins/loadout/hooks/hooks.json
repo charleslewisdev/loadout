@@ -49,6 +49,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/hook-timed\" raid-gate -- \"${CLAUDE_PLUGIN_ROOT}/skills/repo-raid/raid\" gate",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

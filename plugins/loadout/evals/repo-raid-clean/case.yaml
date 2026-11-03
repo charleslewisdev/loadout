@@ -1,0 +1,31 @@
+# repo-raid, typed, with --focus: a tidy fixture repo, so the report stays quiet, and
+# only the three lenses named run. Run with --scaffold --allow-tools Bash Read Grep
+# Glob Agent, and use --judge-model claude-sonnet-5.
+schema_version: "1.1"
+name: repo-raid-clean
+tags: [repo-raid]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 40
+  timeout_seconds: 600
+  allowed_tools: [Read, Grep, Glob, Bash, Agent]
+  prompt: "/loadout:repo-raid . --focus principles,docs,code"
+graders:
+  - name: passed-the-focus
+    type: tool_used
+    tool: Bash
+    input_match: 'repo-raid/raid start .*--focus[\\"'' =]+principles,docs,code'
+  - name: only-the-lenses-named
+    type: llm
+    focus: trace
+    criteria: "The raid start output lists the lenses principles, docs and code. Pass only if the subagents, or the reply if it ran lenses itself, cover those three and no security, public-readiness or portfolio lens runs. Fail otherwise."
+  - name: stayed-quiet
+    type: llm
+    focus: trace
+    criteria: "This repo has no real problems. Judge the report passed to raid save. Pass only if it holds no finding of severity Blocking or Should fix, and at most one Consider. A report saying nothing survived, and naming what was checked, passes. Fail if it invents problems to fill the page."
+  - name: saved-the-report
+    type: tool_used
+    tool: Bash
+    input_match: 'repo-raid/raid.{1,3}save'
