@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.1, 2026-11-03
 
 ### Added
 
@@ -19,6 +19,8 @@
 
 ### Fixed
 
+- `guard/scan --path`, `repo-raid`'s time limit, `scripts/budget` and `scripts/check` work on macOS: no GNU-only `grep -Z`, `paste` without an operand, or `touch -d` and `stat -c` in tests, and a perl alarm stands in for a missing `timeout`, so a FIFO in a raid target no longer hangs `git status`.
+- `install.sh` installs a plugin the profile enables from another registered marketplace, such as an LSP plugin, and names one whose marketplace isn't registered.
 - `scripts/eval` moves version-manager shim directories to the end of `PATH`. In the sandbox a shimmed `python3` failed, and runs spent turns fixing it. A `claude` reachable only through a shim still runs.
 - `scripts/eval` removes workspaces more than a day old from `~/.cache/loadout/eval-tmp` when it starts, since no reboot clears that directory.
 
