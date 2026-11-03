@@ -16,7 +16,8 @@
 # It also sets LOADOUT_REPO to this checkout, where the harness skills open PRs.
 # A second run leaves settings.json byte-identical. Unless --no-register, it adds
 # the loadout marketplace (again, when its source or ref changed) and installs or
-# updates every @loadout plugin the profile enables.
+# updates every @loadout plugin the profile enables, then installs any plugin it
+# enables from another registered marketplace.
 # --ref tracks another branch than the profile's, to run an unmerged branch.
 set -euo pipefail
 
@@ -109,5 +110,17 @@ for id in $(jq -r '.enabledPlugins // {} | to_entries[] | select(.value == true 
     claude plugin update "$id"
   else
     claude plugin install "$id"
+  fi
+done
+# A profile can also enable plugins from other marketplaces, such as LSP plugins.
+# Enabling one doesn't install it, so install what's missing from any registered
+# marketplace, and name the rest. Their updates stay with their own marketplace.
+markets=$(claude plugin marketplace list --json | jq -c '[.[].name]')
+for id in $(jq -r '.enabledPlugins // {} | to_entries[] | select(.value == true and (.key | endswith("@loadout") | not)) | .key' <<<"$wanted"); do
+  jq -e --arg id "$id" 'any(.[]; .id == $id)' >/dev/null <<<"$installed" && continue
+  if jq -e --arg m "${id##*@}" 'index($m) != null' >/dev/null <<<"$markets"; then
+    claude plugin install "$id"
+  else
+    echo "install: $id is enabled, but its marketplace isn't registered, so it wasn't installed" >&2
   fi
 done
