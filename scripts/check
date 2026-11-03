@@ -12,7 +12,9 @@
 #   4. plugin, marketplace and skill names against guard/forbidden-names
 #   5. the statusline, notify, session-start, review gate, gh publication hook and guard/scan tests, and guard/scan --path and retro-evidence on synthetic homes
 #   6. install.sh, gear-outfit's script and map-scout's portfolio script on a synthetic home, gear-heal's and repo-raid's helpers on synthetic repos, scripts/quote-check on stub pages, scripts/budget and scripts/eval against a stub claude, and vale on published
-#      docs where it is installed
+#      docs where it is installed. Also: the graders each <skill>-twin-* eval
+#      case shares with <skill>-smoke, and verify-before-done's regex graders
+#      on sample traces
 #   7. every retro since the audit log began has an entry in docs/audit-log.md
 #   8. the machine-checkable items of docs/public-repo-standard.md
 #   9. locally only: claude plugin validate .
@@ -139,6 +141,32 @@ raid_tests() {  # print only the failed assertions, keep the suite's status
   out=$(scripts/raid.test.sh 2>&1) || rc=$?
   ((rc == 0)) || grep 'FAIL' <<<"$out"
   return "$rc"
+}
+
+# A <skill>-twin-* case feeds a fixed reply to graders of <skill>-smoke, so each
+# grader it shares with the smoke case must carry the same criteria word for word.
+# Its own graders, such as one that checks the echo, are skipped.
+twins_match() {
+  local twin smoke name shared ok=0 found=0
+  crit() { awk -v n="$2" '$0 == "  - name: " n {g = 1; next} /^  - name:/ {g = 0} g && /^    criteria: / {sub(/^    criteria: /, ""); print}' "$1"; }
+  for twin in plugins/*/evals/*-twin-*/case.yaml; do
+    [[ -e $twin ]] || continue
+    found=1
+    smoke=$(dirname "$(dirname "$twin")")/$(basename "$(dirname "$twin")" | sed 's/-twin-.*//')-smoke/case.yaml
+    [[ -f $smoke ]] || { echo "$twin: no $smoke"; ok=1; continue; }
+    shared=0
+    while IFS= read -r name; do
+      grep -qxF "  - name: $name" "$smoke" || continue
+      shared=1
+      if [[ -z $(crit "$twin" "$name") || $(crit "$twin" "$name") != "$(crit "$smoke" "$name")" ]]; then
+        echo "$twin: grader $name differs from $smoke"
+        ok=1
+      fi
+    done < <(sed -n 's/^  - name: //p' "$twin")
+    ((shared)) || { echo "$twin: shares no grader with $smoke"; ok=1; }
+  done
+  ((found)) || { echo "no twin cases found"; return 1; }
+  return $ok
 }
 
 # A plugin install carries only plugins/, so repo-raid holds its own copy of the standard.
@@ -414,6 +442,8 @@ step 'gear-heal helper tests' heal_tests
 step 'repo-raid helper tests' raid_tests
 step 'repo-raid copy of the standard' raid_standard_copy
 step 'eval wrapper tests' eval_tests
+step 'twin cases match their smoke graders' twins_match
+step 'verify-before-done grader regexes' scripts/grader-regex.test.sh
 step 'audit log covers every retro' audit_log_current
 step 'prose lint' prose_lint
 step 'public repo standard' repo_standard

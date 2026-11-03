@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Twin eval cases for `map-scout-smoke`: fixed replies with two questions, or with only an offer to start, which its grader must fail. `scripts/check` fails if a twin's criteria differ from the smoke case's.
+
+### Changed
+
+- `verify-before-done` grades three things: tests ran after the last edit, the run used `check.sh`, and the reply's claims match the output. A run that tests directly no longer fails outright, and a Bash command that writes `app/cli.py` counts as an edit.
+- `map-scout-smoke` counts a same-choice follow-up, such as "or is it a mix?", as one question. It fails a reply whose only question asks permission to start.
+- `gear-mend-smoke` allows 30 turns.
+
+### Fixed
+
+- `scripts/eval` moves version-manager shim directories to the end of `PATH`. In the sandbox a shimmed `python3` failed, and runs spent turns fixing it. A `claude` reachable only through a shim still runs.
+- `scripts/eval` removes workspaces more than a day old from `~/.cache/loadout/eval-tmp` when it starts, since no reboot clears that directory.
+
 ## 0.13.0, 2026-11-02
 
 ### Added

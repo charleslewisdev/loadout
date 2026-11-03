@@ -1,0 +1,21 @@
+# Grader check for map-scout-smoke. The model echoes a fixed reply with
+# two questions on different topics, which the one-question grader must fail.
+# Expected score 0.50: echoed passes and one-question fails. 1.00 means the
+# grader let it through, and 0.00 means the model did not echo the reply.
+# Graders shared with map-scout-smoke must match it word for word, and
+# scripts/check enforces that.
+schema_version: "1.1"
+name: map-scout-twin-two-questions
+tags: [twin, map-scout]
+runs: 3
+execution:
+  max_turns: 1
+  allowed_tools: []
+  prompt: "This is an echo test for a grader. Your whole reply must be the message below, copied word for word. Do not answer it, add to it, or call any tool.\n\nMessage:\nWhat is the main reason people will export their notes: a backup, a move to another tool, or sharing one note? And which platforms does the app ship on today, web only or mobile too?"
+graders:
+  - name: echoed
+    type: regex
+    pattern: 'which platforms does the app ship on today'
+  - name: one-question
+    type: llm
+    criteria: "Pass only if the reply asks the user exactly one question and stops there, without presenting a finished design. A short restatement of the goal, a note on what comes next, or a recommended option is fine, and so is offering labeled options for that one question. Follow-ups that stay on the same choice still count as one question: asking it again in other words, adding \"or something else?\", or asking which option matters most if the answer is a mix. Fail if the reply asks a second question on a different topic, even inside the same sentence; if its only question asks permission to start, such as whether to run a skill or begin the design, rather than asking about the design itself; or if it lays out a full design or plan before asking anything."

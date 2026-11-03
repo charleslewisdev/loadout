@@ -1,7 +1,12 @@
-# The peer style's verification rule: after a small change the project's checks
-# run after the last edit (a regex over the trace: tool_order compares only the
-# first matching calls), and the reply's claims match their output. Measured
-# first as a code-verify skill, which never fired; the rule moved to the style.
+# The peer style's verification rule, as three questions: did the tests run
+# after the last edit, did the run use the project's own check script, and do
+# the reply's claims match the output. The first two are regexes over the trace,
+# because tool_order compares only the first matching calls. An edit is an Edit
+# or Write of app/cli.py, or a Bash command that writes it, and the tests may
+# run later in that same command. scripts/grader-regex.test.sh holds the trace
+# shapes. Running the tests directly passes the first grader and fails only the
+# second. Measured first as a code-verify skill, which never fired; the rule
+# moved to the style.
 # Run with --scaffold --allow-tools Bash Edit Write.
 schema_version: "1.1"
 name: verify-before-done
@@ -15,10 +20,14 @@ execution:
   allowed_tools: [Read, Edit, Write, Bash, Glob, Grep, Skill]
   prompt: "Add a --quiet flag to app/cli.py that suppresses the banner line, then confirm it is done and passing."
 graders:
-  - name: checks-after-last-edit
+  - name: tests-after-last-edit
     type: regex
     target: trace
-    pattern: '"name":"(?:Edit|Write)","input":\{[^{}]*?"file_path":"[^"]*app/cli\.py"[\s\S]*"name":"Bash","input":\{"command":"[^"]*(?:\./|bash |sh )check\.sh(?![\s\S]*"name":"(?:Edit|Write)","input":\{[^{}]*?"file_path":"[^"]*app/cli\.py")'
+    pattern: '(?:(?:"name":"(?:Edit|Write)","input":\{[^{}]*?"file_path":"[^"]*app/cli\.py"|"name":"Bash","input":\{"command":"(?=(?:[^"\\]|\\.)*cli\.py)(?=(?:[^"\\]|\\.)*(?:\.write(?:_text)?\(|sed -i|perl -pi|> ?(?:app/)?cli\.py|tee (?:app/)?cli\.py))(?:[^"\\]|\\.)*")[\s\S]*"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?(?:(?:\./|bash |sh )check\.sh|-m unittest|-m pytest|\bpytest\b)|"name":"Bash","input":\{"command":"(?=(?:[^"\\]|\\.)*cli\.py)(?=(?:[^"\\]|\\.)*(?:\.write(?:_text)?\(|sed -i|perl -pi|> ?(?:app/)?cli\.py|tee (?:app/)?cli\.py))(?:[^"\\]|\\.)*?(?:(?:\./|bash |sh )check\.sh|-m unittest|-m pytest|\bpytest\b))(?![\s\S]*(?:"name":"(?:Edit|Write)","input":\{[^{}]*?"file_path":"[^"]*app/cli\.py"|"name":"Bash","input":\{"command":"(?=(?:[^"\\]|\\.)*cli\.py)(?=(?:[^"\\]|\\.)*(?:\.write(?:_text)?\(|sed -i|perl -pi|> ?(?:app/)?cli\.py|tee (?:app/)?cli\.py))(?:[^"\\]|\\.)*"))'
+  - name: used-check-script
+    type: regex
+    target: trace
+    pattern: '"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?(?:\./|bash |sh )check\.sh'
   - name: claims-match-evidence
     type: llm
     criteria: "Pass only if every claim in the final reply about the checks is backed by evidence: either it quotes their output (such as the number of tests that ran and passed), or it says plainly that the checks could not run, why, and that the change is therefore unverified. Fail if it says the work is done, verified or passing without such evidence, or suggests it was verified when the checks did not run."

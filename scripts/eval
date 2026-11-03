@@ -7,6 +7,7 @@
 # when the account supports it, and eval prompts are a publishing surface. It
 # refuses --publish-report. Cases that plant fixtures need --scaffold, which stays
 # off unless passed. Results land in <plugin-dir>/evals/results/, which git ignores.
+# The model is pinned to Sonnet 5; a later --model, such as claude-opus-5-5, wins.
 #
 # Exits 3 if Bash failed in the eval sandbox, whatever the score says, or if it
 # couldn't check: graders see that a command was attempted, so a broken sandbox can
@@ -15,14 +16,16 @@
 #
 # The eval sandbox makes /tmp read-only for Bash, even inside its own allowed paths,
 # so the workspace goes under the cache directory, not the default temp directory.
+# No reboot clears it, so each start removes workspaces more than a day old.
 #
 # It has no network either, and project settings can't change PATH, so a command
 # that a case needs to fake lives in scripts/eval-bin, which goes first on PATH. It
 # can't live under evals/, because the sandbox hides that directory from Bash.
+# Version-manager shim directories move to the end of PATH, behind system tools.
 set -uo pipefail
 
 if [[ $# -lt 1 || $1 == -* ]]; then
-  sed -n '2,21s/^# \{0,1\}//p' "$0" >&2
+  sed -n '2,24s/^# \{0,1\}//p' "$0" >&2
   exit 2
 fi
 plugin=$1
@@ -43,7 +46,26 @@ trap 'rm -f "$out"' EXIT
 TMPDIR=${XDG_CACHE_HOME:-$HOME/.cache}/loadout/eval-tmp
 mkdir -p "$TMPDIR"
 export TMPDIR
-PATH=$(cd "$(dirname "$0")" && pwd)/eval-bin:$PATH
+# No reboot clears this directory, so drop workspaces over a day old. Newer ones may
+# belong to a run in progress. find -type d skips symlinks, and sealed/ is mode 000.
+while IFS= read -r -d '' dir; do
+  chmod -R u+rwx "$dir" 2>/dev/null
+  rm -rf "$dir"
+done < <(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type d -name 'claude-eval-*' -mmin +1440 -print0)
+# Version-manager shims (pyenv, rbenv, asdf) call into the home directory, which
+# the sandbox hides, so a shimmed python3 fails there and sends runs off fixing it.
+# They move to the end of PATH rather than leaving it, because claude itself, or
+# the node it runs on, may resolve only through one.
+kept_path= shim_path=
+IFS=: read -r -a entries <<<"$PATH"
+for entry in "${entries[@]}"; do
+  if [[ $entry == */shims || $entry == */shims/ ]]; then
+    shim_path+=${shim_path:+:}$entry
+  else
+    kept_path+=${kept_path:+:}$entry
+  fi
+done
+PATH=$(cd "$(dirname "$0")" && pwd)/eval-bin${kept_path:+:$kept_path}${shim_path:+:$shim_path}
 claude plugin eval "$plugin" --no-publish --model claude-sonnet-5 --threshold 0.8 --keep-temp "$@" 2>&1 | tee "$out"
 rc=${PIPESTATUS[0]}
 

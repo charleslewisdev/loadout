@@ -17,6 +17,7 @@ cat >"$t/bin/claude" <<'STUB'
 [[ " $* " == *' --keep-temp '* ]] || { echo 'score 1.0'; exit 0; }
 echo "${TMPDIR:-}" >"$STUB_TMP/tmpdir-seen"
 command -v gh >"$STUB_TMP/gh-seen"
+echo "$PATH" >"$STUB_TMP/path-seen"
 dir=$STUB_TMP/claude-eval-$RANDOM
 mkdir -p "$dir/config" "$dir/sealed"
 [[ ${STUB_BROKEN:-} ]] && echo "$STUB_BROKEN" >"$dir/config/trace.jsonl"
@@ -36,6 +37,15 @@ run STUB_X=1 "$here/eval" plugins/x
 check 'a clean run keeps its exit code' test "$rc" = 0
 check 'the eval gets the stub gh, ahead of any real one' test "$(cat "$t/gh-seen")" = "$here/eval-bin/gh"
 check 'it cleans up the trace it kept' bash -c "! ls -d '$t'/claude-eval-* 2>/dev/null | grep -q ."
+
+run env PATH="$t/bin:$t/.pyenv/shims:/usr/bin:$t/.asdf/shims/:/bin" STUB_TMP="$t" "$here/eval" plugins/x
+check 'version-manager shims move to the end of PATH, behind the system python3' grep -q ":$t/bin:/usr/bin:/bin:$t/.pyenv/shims:$t/.asdf/shims/\$" "$t/path-seen"
+
+mkdir -p "$t/mise/shims"
+cp "$t/bin/claude" "$t/mise/shims/claude"
+run env PATH="$t/mise/shims:/usr/bin:/bin" STUB_TMP="$t" "$here/eval" plugins/x
+check 'a claude reachable only through a shim still runs' test "$rc" = 0
+rm -rf "$t/mise"
 
 run STUB_BROKEN='apply-seccomp: Permission denied' "$here/eval" plugins/x
 check 'a broken sandbox exits 3 even at a passing score' test "$rc" = 3
@@ -68,6 +78,18 @@ check 'no matching cases keeps the CLI exit code' test "$rc" = 1
 mkdir -p "$t/victim" "$t/claude-eval-stale"
 run STUB_VICTIM="$t/victim" "$here/eval" plugins/x
 check 'grader text cannot pick what gets deleted' test -d "$t/victim"
+
+cache=$t/cache/loadout/eval-tmp
+mkdir -p "$cache/claude-eval-old/sealed" "$cache/claude-eval-new" "$cache/keep-me" "$t/victim2"
+chmod 000 "$cache/claude-eval-old/sealed"
+ln -s "$t/victim2" "$cache/claude-eval-link"
+touch -d '2 days ago' "$cache/claude-eval-old" "$cache/keep-me" "$t/victim2"
+touch -h -d '2 days ago' "$cache/claude-eval-link"
+run XDG_CACHE_HOME="$t/cache" "$here/eval" plugins/x
+check 'a workspace left over a day ago is cleared at start, sealed parts too' test ! -e "$cache/claude-eval-old"
+check 'a workspace from today stays, since another run may own it' test -d "$cache/claude-eval-new"
+check 'only claude-eval-* directories are cleared' test -d "$cache/keep-me"
+check 'a symlink is not followed' test -d "$t/victim2"
 
 run STUB_RC=1 "$here/eval" plugins/x
 check 'a low score still exits 1' test "$rc" = 1
