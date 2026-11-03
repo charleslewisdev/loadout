@@ -60,9 +60,9 @@ has_lens() {  # name, lens...
   return 1
 }
 
-# Stock macOS has no timeout, so there the limit is dropped.
+# Stock macOS has no timeout, so there perl sets an alarm, which survives the exec.
 limit() {  # seconds, command...
-  if command -v timeout >/dev/null; then timeout "$@"; else shift; "$@"; fi
+  if command -v timeout >/dev/null; then timeout "$@"; else perl -e 'alarm shift; exec { $ARGV[0] } @ARGV or exit 127' "$@"; fi
 }
 
 # Text from GitHub or a repository: no control characters, capped.

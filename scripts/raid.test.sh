@@ -5,7 +5,7 @@ set -uo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 raid=$root/plugins/loadout/skills/repo-raid/raid
-tmp=$(mktemp -d)
+tmp=$(cd "$(mktemp -d)" && pwd -P) # macOS links /var to /private/var
 trap 'chmod -R u+rwx "${tmp:?}" 2>/dev/null; rm -rf "${tmp:?}"' EXIT
 failed=0
 fail() { echo "FAIL: $1"; failed=1; }
@@ -69,7 +69,7 @@ chmod +x "$tmp/fsmonitor-ran"
 echo 'LEDGER_KEY=not-a-real-key' >"$r/.env"
 echo 'edited, not committed' >>"$r/changed.txt"
 
-touch -d '2020-01-01' "$r/README.md" # a stat change, so status has to read the file
+touch -t 202001010000 "$r/README.md" # a stat change, so status has to read the file
 state() { (cd "$r" && find . -type f -print0 | sort -z | xargs -0 sha256sum); }
 before=$(state)
 
@@ -85,7 +85,7 @@ lacks "$(field lenses)" public-readiness 'public readiness ran on a repo with no
 has "$(field skipped)" 'public-readiness (visibility is local)'
 [[ $(field report) == "$dir/report.md" ]] || fail 'the report path is outside the raid directory'
 [[ $dir == "$raids"/* ]] || fail 'the raid is outside the cache'
-[[ $(stat -c %a "$raids") == 700 ]] || fail 'the raids directory is not private'
+[[ $(stat -c %a "$raids" 2>/dev/null || stat -f %Lp "$raids") == 700 ]] || fail 'the raids directory is not private'
 
 # The guarantees: the real repo is untouched, and the snapshot can't be written.
 [[ $before == "$(state)" ]] || fail 'a run changed the target'
@@ -121,7 +121,7 @@ has "$(cat "$f/settings.txt")" 'no confirmed GitHub origin'
 rc=0; out=$(echo report | "$raid" save "$dir" 2>&1) || rc=$?
 expect 0 'save'
 [[ $(cat "$dir/report.md") == report ]] || fail 'save lost the report'
-[[ $(stat -c %a "$dir/report.md") == 600 ]] || fail 'the report is not private'
+[[ $(stat -c %a "$dir/report.md" 2>/dev/null || stat -f %Lp "$dir/report.md") == 600 ]] || fail 'the report is not private'
 rc=0; out=$(: | "$raid" save "$dir" 2>&1) || rc=$?
 expect 3 'an empty report'
 rc=0; out=$(echo x | "$raid" save "$tmp" 2>&1) || rc=$?
@@ -284,7 +284,7 @@ git -C "$s/sub" config core.fsmonitor "$tmp/fsmonitor-ran"
 git config --global filter.mine.clean "sh -c 'touch $HOME/user-filter-ran; cat'"
 git config --global filter.mine.smudge "sh -c 'touch $HOME/user-filter-ran; cat'"
 rm -f "$HOME/user-filter-ran"
-touch -d '2020-01-01' "$s/a.txt"
+touch -t 202001010000 "$s/a.txt"
 run start "$s" --focus docs
 expect 0 'a repository with a gitlink'
 [[ ! -e $HOME/fsmonitor-ran ]] || fail "a submodule's fsmonitor ran"
@@ -423,7 +423,7 @@ gate allow "$(call general-purpose Bash '{"command":"ls"}')"
 gate allow '{"session_id":"s2","agent_type":"Explore","tool_name":"Bash","tool_input":{"command":"ls"}}' # another session
 gate allow '{"tool_name":"Bash","tool_input":{"command":"ls"}}' # the main session
 # With no raid live, or only a stale one, it stands aside for the rest of the session.
-find "$raids" -name active -exec touch -d '2 days ago' {} +
+find "$raids" -name active -exec perl -e '$t = time - 2 * 86400; utime $t, $t, @ARGV' {} +
 gate allow "$(call Explore Bash '{"command":"ls"}')"
 find "$raids" -name active -delete
 gate allow "$(call Explore Bash '{"command":"ls"}')"
