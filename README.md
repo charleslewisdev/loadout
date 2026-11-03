@@ -4,28 +4,41 @@
 
 Every Claude Code session starts at level 1. It doesn't know how you like to work, where your repo breaks convention, or what you learned the hard way last month.
 
-loadout is the gear I hand it at the door: thirteen skills, six hooks, and a statusline, packaged as a plugin marketplace with one installer. Two optional plugins add more: `bard` adds a voice, and `homelab` adds server skills. One of the thirteen skills is a retro whose favorite move is deleting things.
+loadout is the gear I hand it at the door, a harness: the skills, rules and scripts you add around Claude Code so it works the way you do. It holds skills for planning, debugging, review, docs and PRs, hooks (scripts Claude Code runs on events such as a stop), and a statusline. It installs as a plugin marketplace with one script, and it measures itself. Every piece has to show what it costs and what it changes, and a scheduled retro proposes what to delete.
 
-This repo is for you if you use Claude Code every day and your CLAUDE.md has started to look like a junk drawer. Fork it and change it, because a harness is personal and this one is mine. If you're auditing a harness for a team, start with [For a team](#for-a-team).
+It's for you if you use Claude Code every day and your CLAUDE.md has started to look like a junk drawer. Fork it and change it, because a harness is personal and this one is mine. If you're auditing a harness for a team, start with [Guild rules](#guild-rules-for-a-team).
 
-## Character sheet
+## Level 1: why a harness
 
-`/loadout:gear-stats` prints a longer version of this sheet. These stats are from November 2, 2026, on Claude Code 2.1.316:
+Every session starts from zero: no preferences, no repo conventions, no lessons from last month. Claude Code gives that knowledge places to live, such as output styles, CLAUDE.md files, skills and hooks. A harness is your deliberate, versioned choice of what goes in each place, shared across your machines.
 
-| Stat | Value | In plain words |
-| --- | --- | --- |
-| **Encumbrance** | 4,449 of 6,000 tokens | What my whole setup adds to every session before the first prompt |
-| **Inventory** | 13 skills, plus 1 in `bard` and 1 in `homelab` | Procedures Claude picks up when they apply, or that you type |
-| **Reflexes** | 6 hooks, all under 300 ms at p95 | Things that always happen, because a script does them |
-| **Class** | `bard:peer` | The output style: who Claude is talking to, and how |
-| **Save point** | Every 90 days at most | A retro that opens one pull request of additions and deletions |
+The thing to guard against is growth. A harness rarely fails by being wrong. It works, then it collects rules, skills and plugins until nobody can say what any one of them does. So this one stays small, and each piece pays for its slot. [The guide](WRITING-AN-EFFECTIVE-HARNESS.md) explains how, and what the measurements found.
 
-Until November 2026 `scripts/budget` could miss account connectors, and it reported 5,986. The true figure was 9,016, over the ceiling, and most of it came from my Claude account, not this repo. Trimming the account's skills and connectors per machine brought it down, and the [audit log](docs/audit-log.md) keeps score. The `loadout` plugin is 476 of the total, `bard` is 728, and `homelab` is 73.
+## The pack: what's inside
 
-> [!NOTE]
-> **About the evidence.** Every number here comes from a command I ran, or carries a link. Rules I could test had to change Claude's behavior in a with-and-without eval to stay, [the guide](WRITING-AN-EFFECTIVE-HARNESS.md) lists the exceptions, and [the eval results](docs/eval-results.md) show the latest score for every case. Anything marked **opinion** is my taste, not how Claude Code behaves.
+loadout is a plugin marketplace. Enable only the plugins you want.
 
-## Install
+| Plugin | Scope |
+| --- | --- |
+| `loadout` | The core: skills for a ticket from idea to PR, skills that keep the harness itself current, the hooks and the statusline |
+| `bard` | Optional: the `peer` output style, which sets how Claude talks to you, and a skill that drafts text published under your name |
+| `homelab` | Optional server skills, such as deploying containers to unRAID |
+
+A few of the skills:
+
+| Skill | What it does |
+| --- | --- |
+| `/loadout:map-scout` | Turns an open idea into a decision, one question at a time |
+| `/loadout:bug-hunt` | Reproduces a bug with a failing test before it changes code |
+| `/loadout:review-party` | Runs your checks and the app, then sends independent reviewers |
+| `/loadout:gear-respec` | The retro: proposes what to add and what to delete, in one pull request |
+| `/loadout:repo-raid` | Audits any repo, read-only, and writes a private report |
+
+`/loadout:gear-stats` prints the harness's measured state: what it adds to each session, hook timings and the last retro. The guide has [the full inventory](WRITING-AN-EFFECTIVE-HARNESS.md#the-kit), and [the audit log](docs/audit-log.md) has every measurement so far.
+
+`map-scout` and `repo-raid` send the names and descriptions of your GitHub repos, private ones included, and the latest commit subjects of the newest ones, to your Claude session without asking. To turn that off and keep the skills, create `~/.config/loadout/no-portfolio`. The guide says [what each skill sends where](WRITING-AN-EFFECTIVE-HARNESS.md#what-sends-data-where).
+
+## Gear up: install
 
 You need bash 5 or newer (on macOS, `brew install bash`), `git`, `jq`, `perl`, and the `claude` CLI. The PR and retro skills also need `gh`.
 
@@ -51,105 +64,49 @@ To uninstall:
 
 </details>
 
-## Crystal Bridge
+## Clear a dungeon: one ticket, start to finish
+
+1. Run `map-scout` if the approach is still open.
+2. Run `map-draw` if the work spans sessions, then `map-follow` to carry out the plan.
+3. Run `bug-hunt` when something breaks along the way.
+4. Run `review-party` before you call it done. A hook asks for it when two or more files changed.
+5. Run `pr-turn-in` to commit and open the PR.
+
+Claude picks most of these up on its own when they apply. The upkeep skills, such as `gear-respec`, run only when you type them.
+
+## Forge a skill: add your own
+
+1. Write the eval first, in `plugins/loadout/evals/<name>-smoke/case.yaml`.
+2. Write `plugins/loadout/skills/<subject>-<flavor>/SKILL.md`, with a description under 200 characters that says what it does and when to use it.
+3. Run `scripts/eval plugins/loadout --case <name>-smoke`, and keep the skill only if the with-plugin arm beats the baseline.
+4. Run `scripts/check` and open a PR.
+
+The guide has [the full steps](WRITING-AN-EFFECTIVE-HARNESS.md#add-a-skill), and [section 6](WRITING-AN-EFFECTIVE-HARNESS.md#6-write-the-eval-first) explains how evals decide what stays.
+
+## Reroll: fork it
+
+1. Start from `profiles/example.json`.
+2. Add your commit email to `guard/allowed-emails`, or pre-commit and CI will reject your commits. Keep the existing lines, because the history you forked needs them.
+3. Write a generator for your own identity guard denylist, in the shape of `guard/denylist.example`. Mine isn't published, because its sources are private. [Section 10](WRITING-AN-EFFECTIVE-HARNESS.md#fork-the-guard) says what it needs and which skills depend on it.
+4. Run `git config core.hooksPath .githooks` so the guard runs, and run `scripts/check` before a PR. [CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
+
+Keep the machinery: the budget script and lint, the eval runner, the hook wrapper, the installer, and the one-store memory rule. Replace the opinions: the style's wording, the skill set, the statusline segments, the hook budgets, and the retro's cadence.
+
+## Guild rules: for a team
+
+A shared harness fails the same way a personal one does, only bigger, because every session of every person pays for every always-on token. The guide covers [what changes for a team](WRITING-AN-EFFECTIVE-HARNESS.md#11-share-it-with-a-team), with a six-step audit you can run on your own harness.
+
+## Allies: Crystal Bridge
 
 loadout grew up beside [Crystal Bridge](https://github.com/crystal-bridge/crystal-bridge), a web app that runs Claude Code sessions across all your machines and dresses them up as a 16-bit RPG. That's where the flavor here comes from. Its Inventory panel lists these skills, and their names read like gear.
 
 Neither project needs the other. The one seam is `CRYSTAL_SESSION`: any host that sends its own notifications can set it, and the notify hook stays quiet.
 
-## Why a harness
+## Lore: read more
 
-Every session starts from zero: no preferences, no repo conventions, no lessons from last month. Claude Code gives that knowledge places to live, such as output styles, CLAUDE.md files, skills, and hooks. A harness is your deliberate, versioned choice of what goes in each place, shared across your machines.
-
-The thing to guard against is growth. A harness rarely fails by being wrong. It works, then it collects rules, skills, and plugins until nobody can say what any one of them does. So this one stays small and measured, and everything in it pays for its slot.
-
-## What goes where
-
-Each kind of instruction has one home.
-
-| Layer | Use it for | What it costs |
-| --- | --- | --- |
-| Output style | Who Claude is talking to, and how | Every session |
-| User `~/.claude/CLAUDE.md` | Hard rules for every project | Every session |
-| Project `CLAUDE.md` | Build and test commands, conventions that differ from defaults | Every session in that repo |
-| Rule in `.claude/rules/` with `paths:` | Guidance for one part of the code | Nothing until a matching file is read |
-| Skill | A procedure or domain knowledge | The description always, the body when used |
-| Hook | A guarantee, run outside the model | Milliseconds per call |
-| Statusline | What you glance at | Zero tokens |
-
-To place something new, ask three questions:
-
-- **Must it always happen?** Make it a hook, because prose can't guarantee anything.
-- **Should Claude pick it when relevant?** Make it a skill.
-- **Do you run it on purpose?** Make it a typed-only skill (`disable-model-invocation: true`), which costs nothing until you type it.
-
-## Inventory
-
-| Skill | Invoked by | What it does |
-| --- | --- | --- |
-| `map-scout` | Claude | Turns an open idea into a decision, and flags your other repos when one relates |
-| `map-draw` | Claude | Turns a decision into a plan, with a test per task |
-| `map-follow` | Claude | Runs the plan task by task in fresh subagents |
-| `bug-hunt` | Claude | Reproduces a bug with a failing test before it changes code |
-| `review-party` | Claude | Runs your checks and the app, sends independent reviewers, and keeps findings a verifier scores 80 of 100 or higher |
-| `lore-scribe` | Claude, on Markdown and `docs/` files | Writes docs by one set of rules, in each repo's own voice |
-| `pr-turn-in` | Claude | Handles branches, commits, and PRs, and checks each PR claim against `git diff` |
-| `gear-stats` | You | Prints the character sheet |
-| `gear-mend` | You | Logs one annoyance for the next retro, plus the fix when it's clear |
-| `gear-respec` | You | Runs the retro and proposes what to add and delete |
-| `gear-heal` | You | Audits the harness in a `loadout` checkout, or a repo's instruction files anywhere else, and proposes every change in one pull request |
-| `repo-raid` | You | Audits any repo, read-only, through six lenses and writes a private report: principles, security, public readiness, docs, code and portfolio |
-| `gear-outfit` | You | Recommends settings and permissions from your answers and your real denials, then leaves applying them to you |
-| `scribe-as-me` (`bard`) | You | Drafts text published under your name, and never posts it |
-| `unraid` (`homelab`) | Claude | Deploys and inspects containers on an unRAID server, and reads your local notes for that server's facts |
-
-The six hooks check your configuration at session start, send desktop notifications on stop and on input needed (two hooks), format files where the repo uses prettier or ruff, hold `repo-raid`'s subagents to the raid while one is live, and run `review-gate`. That last one blocks a stop once per batch of work when two or more files changed since the last `review-party`, so Claude reviews multi-file work before calling it done. Work that's nothing but prose docs passes.
-
-### One ticket, start to finish
-
-1. Run `map-scout` if the approach is still open.
-2. Run `map-draw` if the work spans sessions, then `map-follow` to carry out the plan.
-3. Run `bug-hunt` when something breaks along the way.
-4. Run `review-party` before you call it done.
-5. Run `pr-turn-in` to commit and open the PR.
-
-`map-scout` runs a `gh` query on every use, without a prompt. It sends the names and descriptions of up to 100 repos you own or reach through an organization, private ones included, plus the latest commit subjects of the newest 8, to your Claude session. To turn the check off and keep the skill, create the file `~/.config/loadout/no-portfolio`.
-
-`repo-raid` runs the same query in its portfolio lens, and the same file turns that off. It also copies your `~/.claude/CLAUDE.md` into the raid for its principles lens, and all of it stays on your machine and in your session, except a GitHub target's settings, which it reads through `gh`. On a local repo it reads GitHub only if GitHub holds that repo's root commit. It refuses a linked worktree, or a repo cloned with `--shared`: raid the main checkout.
-
-Outside the ticket, `gear-stats` reads the sheet, `gear-mend` handles anything that annoys you, `gear-respec` is the periodic save point, `gear-heal` audits the harness or a repo's instruction files, `repo-raid` audits a whole repo, and `gear-outfit` keeps your settings and permissions current.
-
-### Add a skill
-
-1. Write the eval first: `plugins/loadout/evals/<name>-smoke/case.yaml`, with a `tool_used: Skill` grader marked `arm: with-only` and at least one grader for the result.
-2. Create `plugins/loadout/skills/<subject>-<flavor>/SKILL.md`. Keep the description under 200 characters, and say what the skill does and when to use it. Keep the body under 150 lines. If people type it rather than Claude picking it, add `disable-model-invocation: true`.
-3. Run `scripts/eval plugins/loadout --case <name>-smoke`. If the case plants files, add `--scaffold --allow-tools Bash Edit Write`. Keep the skill only if the with-plugin arm beats the baseline.
-4. Run `scripts/check` and open a PR. After the merge, invoke the skill once by name so its usage score starts above zero.
-
-A skill from outside arrives with `disable-model-invocation: true` and earns its place in the listing.
-
-## Big reference material
-
-Reference material should never load by itself. Take a 2,000-term glossary. My answer (**opinion**): put it in a data file such as `glossary.tsv`, and add one pointer line to CLAUDE.md that names the file and the `grep` command to search it. Nothing loads until a term comes up. The guide has [the full ladder](WRITING-AN-EFFECTIVE-HARNESS.md#8-keep-reference-material-out-of-the-pack), from a pointer line up to a live query, and three splits that don't work.
-
-## If you fork it
-
-1. Start from `profiles/example.json`.
-2. Add your commit email to `guard/allowed-emails`, or pre-commit and CI will reject your commits. Keep the existing lines, because the history you forked needs them.
-3. Write a generator for your own identity guard denylist. It prints one extended regex per line to `~/.config/loadout-guard/denylist` (mode 0600), in the shape of `guard/denylist.example`, plus a canary line of your own. Mine isn't published, because its sources are private. `gear-heal` needs it, not only the hooks: without a readable denylist, repo mode's transcript evidence is skipped, and in both modes it stops at a local commit instead of opening a pull request. `repo-raid` needs `$LOADOUT_REPO` and the denylist for its scan of every ref: without the checkout it says the scan didn't run, and without the denylist the scan reports that as a finding.
-4. Run `git config core.hooksPath .githooks` so the guard runs, and run `scripts/check` before a PR. [CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
-
-Keep the machinery: the budget script and lint, the eval runner, the hook wrapper, the installer, and the one-store memory rule. Replace the opinions: the style's wording, the skill set, the statusline segments, the hook budgets, and the retro's cadence.
-
-## For a team
-
-A shared harness fails the same way a personal one does, only bigger, because every session of every person pays for every always-on token. The guide covers [what changes for a team](WRITING-AN-EFFECTIVE-HARNESS.md#11-share-it-with-a-team) and includes a six-step audit you can run on your own harness.
-
-## Read more
-
-[Writing an effective harness](WRITING-AN-EFFECTIVE-HARNESS.md) is the long version: why each piece works the way it does, what I rejected, and [how I got here](WRITING-AN-EFFECTIVE-HARNESS.md#12-how-i-got-here), including everything I got wrong along the way.
-
-The [public repo standard](docs/public-repo-standard.md) is the checklist every public repo here meets.
+- [Writing an effective harness](WRITING-AN-EFFECTIVE-HARNESS.md) is the long version: why each piece works the way it does, what I rejected, and everything I got wrong along the way.
+- [The eval results](docs/eval-results.md) show the latest score for every case.
+- [The public repo standard](docs/public-repo-standard.md) is the checklist every public repo here meets.
 
 ## License
 

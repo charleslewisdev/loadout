@@ -15,7 +15,8 @@
 #      docs where it is installed. Also: the graders each <skill>-twin-* eval
 #      case shares with <skill>-smoke, and verify-before-done's regex graders
 #      on sample traces
-#   7. every retro since the audit log began has an entry in docs/audit-log.md
+#   7. every retro since the audit log began has an entry in docs/audit-log.md,
+#      and README.md prose holds no number that drifts
 #   8. the machine-checkable items of docs/public-repo-standard.md
 #   9. locally only: claude plugin validate .
 set -uo pipefail
@@ -167,6 +168,22 @@ twins_match() {
   done
   ((found)) || { echo "no twin cases found"; return 1; }
   return $ok
+}
+
+# The README is a filter, so its prose holds no number a routine change would make
+# stale. Code, link targets and list markers are skipped, and a few stable numbers
+# are allowed: a version requirement, a description limit, guide section numbers.
+# It reads digits only, so a count spelled out in words still needs a reader.
+readme_no_counts() {
+  local hits
+  [[ -r README.md ]] || { echo "README.md is missing or unreadable"; return 1; }
+  hits=$(perl -ne '
+    $f = !$f if /^```/; next if $f;
+    s/`[^`]*`//g; s/\]\([^)]*\)/]/g; s/^\s*\d+\.\s//; s/<[^>]*>//g;
+    s/\b(?:bash \d+|\d+-bit|[Ll]evel 1|\d+ characters|[Ss]ection \d+)\b//g;
+    print "README.md:$.: $_" if /\d/;
+  ' README.md)
+  [[ -z $hits ]] || { echo "README numbers that drift; move them to the guide, dated:"; echo "$hits"; return 1; }
 }
 
 # A plugin install carries only plugins/, so repo-raid holds its own copy of the standard.
@@ -445,6 +462,7 @@ step 'eval wrapper tests' eval_tests
 step 'twin cases match their smoke graders' twins_match
 step 'verify-before-done grader regexes' scripts/grader-regex.test.sh
 step 'audit log covers every retro' audit_log_current
+step 'README has no numbers that drift' readme_no_counts
 step 'prose lint' prose_lint
 step 'public repo standard' repo_standard
 step 'public repo standard catches a broken repo' repo_standard_negative

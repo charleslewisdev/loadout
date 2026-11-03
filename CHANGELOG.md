@@ -5,9 +5,14 @@
 ### Added
 
 - Twin eval cases for `map-scout-smoke`: fixed replies with two questions, or with only an offer to start, which its grader must fail. `scripts/check` fails if a twin's criteria differ from the smoke case's.
+- `readme-first-screen`, an eval case that sees only the README above its first section and says what loadout is and who it's for.
+- `scripts/check` fails on a number in README prose, outside a short list of stable ones.
 
 ### Changed
 
+- The README is a filter: what loadout is and who it's for, why a harness, the plugins and a few sample skills, install, and short versions of the ticket workflow, adding a skill, forking and team use. It carries no counts or dated stats, and `/loadout:gear-stats` stands in for the character sheet.
+- The guide holds what left the README: the full skill and hook inventory, what sends data where, the full steps to add a skill, and what a fork's guard denylist needs. The layer table and the reference-material ladder were already there.
+- `readme-s6` asks what the new README answers: why a harness, install, adding a skill, and where to read more.
 - `verify-before-done` grades three things: tests ran after the last edit, the run used `check.sh`, and the reply's claims match the output. A run that tests directly no longer fails outright, and a Bash command that writes `app/cli.py` counts as an edit.
 - `map-scout-smoke` counts a same-choice follow-up, such as "or is it a mix?", as one question. It fails a reply whose only question asks permission to start.
 - `gear-mend-smoke` allows 30 turns.

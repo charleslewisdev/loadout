@@ -62,7 +62,8 @@ The two `map-scout-twin-*` cases check that grader. Each makes the model echo a 
 | map-scout-twin-offer-only | loadout | no | 0.50 | 2026-11-03 | 2.1.316 |
 | map-scout-twin-two-questions | loadout | no | 0.50 | 2026-11-03 | 2.1.316 |
 | pr-turn-in-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
-| readme-s6 | loadout | no | 1.00 | 2026-10-31 | 2.1.316 |
+| readme-first-screen | loadout | no | 1.00 | 2026-11-03 | 2.1.316 |
+| readme-s6 | loadout | no | 1.00 | 2026-11-03 | 2.1.316 |
 | repo-raid-clean | loadout | yes | 1.00 | 2026-11-03 | 2.1.316 |
 | repo-raid-planted | loadout | yes | 1.00 | 2026-11-03 | 2.1.316 |
 | review-party-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |

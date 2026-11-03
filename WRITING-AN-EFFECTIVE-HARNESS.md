@@ -22,6 +22,8 @@ This guide is what I learned building [loadout](README.md). The sections run in 
 11. [Share it with a team](#11-share-it-with-a-team). The mechanisms stay the same, and the shape changes.
 12. [How I got here](#12-how-i-got-here). The story, and the reversals.
 
+[The kit](#the-kit) at the end lists every skill and hook, and says what each one sends where.
+
 ## 1. Count what you carry
 
 Every RPG has a weight limit, and Claude Code's is the context window. Your **harness share** is the tokens your setup adds to every session before you type anything. One command gives you the raw total:
@@ -338,6 +340,13 @@ A clean scan has to stay reachable, or people learn to ignore the guard. Two too
 
 To leave a machine clean, run `guard/scan --path ~`. It reads every file under a directory as bytes, checks every name, and reports denylist line numbers only. It can't see inside archives or compressed documents, and it doesn't decode UTF-16, which some app databases use. Uninstalling isn't enough. Private terms hide where no uninstall reaches: the Docker build cache, editor and chat-app state, shell history, a pip-installed client, Claude Code's own config backups, and search queries a memory server logs in each memory's metadata. Read the findings for lines that can only mean a private term first, because denylist lines that are also ordinary words make most of the noise.
 
+### Fork the guard
+
+A fork needs its own denylist, because mine isn't published: its sources are private. Write a generator that prints one extended regex per line to `~/.config/loadout-guard/denylist`, mode 0600, in the shape of `guard/denylist.example`, plus a canary line of your own. Two skills depend on it, not only the hooks:
+
+- **`gear-heal`** skips repo mode's transcript evidence without a readable denylist, and in both modes it stops at a local commit instead of opening a pull request.
+- **`repo-raid`** needs `$LOADOUT_REPO` and the denylist for its scan of every ref. Without the checkout it says the scan didn't run, and without the denylist the scan reports that as a finding.
+
 ## 11. Share it with a team
 
 A team harness fails the same way a personal one does, and every always-on token is paid by every session of every person. The mechanisms carry over, and the shape changes. Use a versioned team marketplace, with plugins enabled per role (developer, QA, DevOps) and per project. Push rules everyone shares through managed settings and a managed CLAUDE.md, not a copied user file. The same guard works for customer names, internal codenames, and secrets before anything leaves the company.
@@ -390,6 +399,49 @@ Every pass reversed something the previous one believed. Each reversal came from
 10. **Whole-transcript skipping.** Scripts that read `~/.claude` skipped every transcript matching the denylist. My old setup put private names into ordinary sessions, so nothing was left to count. Count-only scripts now withhold matching records and count the rest.
 
 And some reviews caught me in the act. A review of an early draft of this guide found 28 errors, and every one sat in a paraphrase. None sat in the research notes it summarized. That's why Anthropic's words here are pasted.
+
+## The kit
+
+The skills, hooks and workflow as of November 2, 2026. `/loadout:gear-stats` prints the measured state of your own copy, and [the audit log](docs/audit-log.md) records each measurement.
+
+| Skill | Invoked by | What it does |
+| --- | --- | --- |
+| `map-scout` | Claude | Turns an open idea into a decision, and flags your other repos when one relates |
+| `map-draw` | Claude | Turns a decision into a plan, with a test per task |
+| `map-follow` | Claude | Runs the plan task by task in fresh subagents |
+| `bug-hunt` | Claude | Reproduces a bug with a failing test before it changes code |
+| `review-party` | Claude | Runs your checks and the app, sends independent reviewers, and keeps findings a verifier scores 80 of 100 or higher |
+| `lore-scribe` | Claude, on Markdown and `docs/` files | Writes docs by one set of rules, in each repo's own voice |
+| `pr-turn-in` | Claude | Handles branches, commits, and PRs, and checks each PR claim against `git diff` |
+| `gear-stats` | You | Prints the harness's measured state |
+| `gear-mend` | You | Logs one annoyance for the next retro, plus the fix when it's clear |
+| `gear-respec` | You | Runs the retro and proposes what to add and delete |
+| `gear-heal` | You | Audits the harness in a `loadout` checkout, or a repo's instruction files anywhere else, and proposes every change in one pull request |
+| `repo-raid` | You | Audits any repo, read-only, through six lenses and writes a private report: principles, security, public readiness, docs, code and portfolio |
+| `gear-outfit` | You | Recommends settings and permissions from your answers and your real denials, then leaves applying them to you |
+| `scribe-as-me` (`bard`) | You | Drafts text published under your name, and never posts it |
+| `unraid` (`homelab`) | Claude | Deploys and inspects containers on an unRAID server, and reads your local notes for that server's facts |
+
+The hooks check your configuration at session start, send desktop notifications on stop and on input needed, format files where the repo uses prettier or ruff, hold `repo-raid`'s subagents to the raid while one is live, and run `review-gate`. That last one blocks a stop once per batch of work when two or more files changed since the last `review-party`, so Claude reviews multi-file work before calling it done. Work that's nothing but prose docs passes.
+
+### What sends data where
+
+`map-scout` runs a `gh` query on every use, without a prompt. It sends the names and descriptions of up to 100 repos you own or reach through an organization, private ones included, plus the latest commit subjects of the newest 8, to your Claude session. To turn the check off and keep the skill, create the file `~/.config/loadout/no-portfolio`.
+
+`repo-raid` runs the same query in its portfolio lens, and the same file turns that off. It also copies your `~/.claude/CLAUDE.md` into the raid for its principles lens, and all of it stays on your machine and in your session, except a GitHub target's settings, which it reads through `gh`. On a local repo it reads GitHub only if GitHub holds that repo's root commit. It refuses a linked worktree, or a repo cloned with `--shared`: raid the main checkout.
+
+### Outside a ticket
+
+`gear-stats` reads the measured state, `gear-mend` handles anything that annoys you, `gear-respec` is the periodic save point, `gear-heal` audits the harness or a repo's instruction files, `repo-raid` audits a whole repo, and `gear-outfit` keeps your settings and permissions current.
+
+### Add a skill
+
+1. Write the eval first: `plugins/loadout/evals/<name>-smoke/case.yaml`, with a `tool_used: Skill` grader marked `arm: with-only` and at least one grader for the result.
+2. Create `plugins/loadout/skills/<subject>-<flavor>/SKILL.md`. Keep the description under 200 characters, and say what the skill does and when to use it. Keep the body under 150 lines. If people type it rather than Claude picking it, add `disable-model-invocation: true`.
+3. Run `scripts/eval plugins/loadout --case <name>-smoke`. If the case plants files, add `--scaffold --allow-tools Bash Edit Write`. Keep the skill only if the with-plugin arm beats the baseline.
+4. Run `scripts/check` and open a PR. After the merge, invoke the skill once by name so its usage score starts above zero.
+
+A skill from outside arrives with `disable-model-invocation: true` and earns its place in the listing.
 
 ## Sources
 

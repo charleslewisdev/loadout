@@ -1,0 +1,23 @@
+# The first-screen test: a fresh session sees only the README's opening, above
+# its first section heading, and says what loadout is and who it's for. The
+# README is a filter, so that opening has to carry both. Run with --scaffold.
+schema_version: "1.1"
+name: readme-first-screen
+tags: [docs]
+runs: 3
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 3
+  allowed_tools: [Read]
+  prompt: >-
+    Read README.md in this directory and use nothing else: no other file and no
+    prior knowledge of this project. In two short numbered answers: 1. What is
+    this project? 2. Who is it for?
+graders:
+  - name: what-it-is
+    type: llm
+    criteria: "Judge only answer 1. Pass if it says the project is a harness, kit or set of add-ons for Claude Code (such as skills, hooks or a statusline), installed or shipped as plugins or a plugin marketplace, that you can fork. Fail if it is vague about what the project contains, or says it is something else, such as an app or a model."
+  - name: who-its-for
+    type: llm
+    criteria: "Judge only answer 2. Pass if it names people who use Claude Code regularly and whose setup or CLAUDE.md has grown cluttered, or who want their own measured setup to fork. Mentioning teams auditing a harness as a second audience is fine. Fail if it gives no audience, or a generic one such as \"developers\"."
