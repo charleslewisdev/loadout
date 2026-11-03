@@ -10,6 +10,8 @@ Three cases sit below the pass mark, each with a recorded reason:
 
 `scripts/eval-summary` lists the newest run of a case whatever its model, so the `gear-heal` rows below show Opus 5.5. On Sonnet 5, the pinned model, all three scored 1.00. Each case ran three times on each model, with `--disallow-tools Agent`, because the review gate otherwise starts a full review inside the run. Judges ran on Sonnet, and `gear-heal-harness` now grades its edits with regexes, because judges failed correct work there.
 
+The `repo-raid` rows also show Opus 5.5. On Sonnet 5, `repo-raid-clean` scored 1.00 and `repo-raid-planted` 0.96, where one run of three dropped a planted finding at verification. Each case ran three times on each model, with subagents on, and judges on Sonnet.
+
 | Case | Plugin | Uses Bash | Score | Date | CLI |
 | --- | --- | --- | --- | --- | --- |
 | anti-tic | bard | no | 0.97 | 2026-11-02 | 2.1.316 |
@@ -55,5 +57,7 @@ Three cases sit below the pass mark, each with a recorded reason:
 | map-scout-smoke | loadout | no | 1.00 | 2026-11-02 | 2.1.316 |
 | pr-turn-in-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
 | readme-s6 | loadout | no | 1.00 | 2026-10-31 | 2.1.316 |
+| repo-raid-clean | loadout | yes | 1.00 | 2026-11-03 | 2.1.316 |
+| repo-raid-planted | loadout | yes | 1.00 | 2026-11-03 | 2.1.316 |
 | review-party-smoke | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |
 | review-party-trigger | loadout | yes | 1.00 | 2026-11-02 | 2.1.316 |

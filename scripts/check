@@ -11,7 +11,7 @@
 #      it exists (never in CI)
 #   4. plugin, marketplace and skill names against guard/forbidden-names
 #   5. the statusline, notify, session-start, review gate, gh publication hook and guard/scan tests, and guard/scan --path and retro-evidence on synthetic homes
-#   6. install.sh, gear-outfit's script and map-scout's portfolio script on a synthetic home, gear-heal's helper on synthetic repos, scripts/quote-check on stub pages, scripts/budget and scripts/eval against a stub claude, and vale on published
+#   6. install.sh, gear-outfit's script and map-scout's portfolio script on a synthetic home, gear-heal's and repo-raid's helpers on synthetic repos, scripts/quote-check on stub pages, scripts/budget and scripts/eval against a stub claude, and vale on published
 #      docs where it is installed
 #   7. every retro since the audit log began has an entry in docs/audit-log.md
 #   8. the machine-checkable items of docs/public-repo-standard.md
@@ -132,6 +132,18 @@ heal_tests() {  # print only the failed assertions, keep the suite's status
   out=$(scripts/heal.test.sh 2>&1) || rc=$?
   ((rc == 0)) || grep 'FAIL' <<<"$out"
   return "$rc"
+}
+
+raid_tests() {  # print only the failed assertions, keep the suite's status
+  local out rc=0
+  out=$(scripts/raid.test.sh 2>&1) || rc=$?
+  ((rc == 0)) || grep 'FAIL' <<<"$out"
+  return "$rc"
+}
+
+# A plugin install carries only plugins/, so repo-raid holds its own copy of the standard.
+raid_standard_copy() {
+  cmp docs/public-repo-standard.md plugins/loadout/skills/repo-raid/public-repo-standard.md
 }
 
 portfolio_tests() {  # print only the failed assertions, keep the suite's status
@@ -399,6 +411,8 @@ step 'gear-outfit tests' outfit_tests
 step 'portfolio tests' portfolio_tests
 step 'quote check tests' quote_check_tests
 step 'gear-heal helper tests' heal_tests
+step 'repo-raid helper tests' raid_tests
+step 'repo-raid copy of the standard' raid_standard_copy
 step 'eval wrapper tests' eval_tests
 step 'audit log covers every retro' audit_log_current
 step 'prose lint' prose_lint
