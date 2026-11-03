@@ -75,5 +75,29 @@ if install example --machine "$tmp/absent.json"; then
 fi
 grep -q 'no machine profile' "$tmp/out" || fail "a missing machine profile gave the wrong message: $(cat "$tmp/out")"
 
+# Registering, with a stub claude: an enabled plugin from another registered
+# marketplace is installed when missing, and one from an unknown marketplace is named.
+mkdir -p "$tmp/bin"
+cat >"$tmp/bin/claude" <<'STUB'
+#!/usr/bin/env bash
+echo "$*" >>"$STUB_LOG"
+case "$*" in
+  'plugin marketplace list --json') echo '[{"name":"loadout","source":"github","repo":"o/r","ref":"main"},{"name":"other"}]' ;;
+  'plugin list --json') echo '[{"id":"loadout@loadout"},{"id":"have@other"}]' ;;
+esac
+STUB
+chmod +x "$tmp/bin/claude"
+cat >"$tmp/others.json" <<'JSON'
+{"enabledPlugins": {"have@other": true, "need@other": true, "off@other": false, "lost@nowhere": true}}
+JSON
+echo '{}' >"$home/.claude/settings.json"
+HOME=$home PATH="$tmp/bin:$PATH" STUB_LOG=$tmp/calls "$root/install.sh" example --machine "$tmp/others.json" >"$tmp/out" 2>&1 ||
+  fail "install with registering exited nonzero: $(cat "$tmp/out")"
+grep -qx 'plugin install need@other' "$tmp/calls" || fail "a missing plugin from another marketplace wasn't installed"
+! grep -q 'install have@other' "$tmp/calls" || fail "an installed plugin from another marketplace was reinstalled"
+! grep -q 'off@other' "$tmp/calls" || fail "a disabled plugin was installed"
+! grep -q 'lost@nowhere' "$tmp/calls" || fail "a plugin from an unregistered marketplace was installed"
+grep -q 'lost@nowhere is enabled' "$tmp/out" || fail "a plugin from an unregistered marketplace wasn't named"
+
 ((failed == 0)) && echo "install tests: passed"
 exit "$failed"
