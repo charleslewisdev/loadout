@@ -83,8 +83,8 @@ cache=$t/cache/loadout/eval-tmp
 mkdir -p "$cache/claude-eval-old/sealed" "$cache/claude-eval-new" "$cache/keep-me" "$t/victim2"
 chmod 000 "$cache/claude-eval-old/sealed"
 ln -s "$t/victim2" "$cache/claude-eval-link"
-touch -d '2 days ago' "$cache/claude-eval-old" "$cache/keep-me" "$t/victim2"
-touch -h -d '2 days ago' "$cache/claude-eval-link"
+perl -e '$t = time - 2 * 86400; utime $t, $t, @ARGV' "$cache/claude-eval-old" "$cache/keep-me" "$t/victim2"
+touch -h -t "$(date -d '2 days ago' +%Y%m%d%H%M 2>/dev/null || date -v-2d +%Y%m%d%H%M)" "$cache/claude-eval-link"
 run XDG_CACHE_HOME="$t/cache" "$here/eval" plugins/x
 check 'a workspace left over a day ago is cleared at start, sealed parts too' test ! -e "$cache/claude-eval-old"
 check 'a workspace from today stays, since another run may own it' test -d "$cache/claude-eval-new"

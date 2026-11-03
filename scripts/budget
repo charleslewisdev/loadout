@@ -116,13 +116,13 @@ measure() {
     top=$(sort -n "$tmp/$label.samples" | tail -1 | cut -d' ' -f1)
     kept=$(awk -v t="$top" '$1 == t { n++ } END { print n + 0 }' "$tmp/$label.samples")
     if ((!arrival)); then
-      cut -d' ' -f2 "$tmp/$label.samples" | sort -n | sed -n '1p;$p' | paste -sd' ' >"$tmp/$label.range"
+      cut -d' ' -f2 "$tmp/$label.samples" | sort -n | sed -n '1p;$p' | paste -sd' ' - >"$tmp/$label.range"
       echo "$top" >"$tmp/$label.top"
       return 0
     fi
     if ((top > base_deferred && kept >= runs)); then
       awk -v t="$top" '$1 == t { print $2 }' "$tmp/$label.samples" | sort -n | sed -n '1p;$p' |
-        paste -sd' ' >"$tmp/$label.range"
+        paste -sd' ' - >"$tmp/$label.range"
       missed_runs=$((missed_runs + done - kept))
       return 0
     fi
